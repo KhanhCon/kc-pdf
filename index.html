@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PDFCraft — PDF Tools</title>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- pdf-lib -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<!-- SortableJS for drag-reorder -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0e0f11;
+    --surface: #161719;
+    --surface2: #1e2022;
+    --surface3: #252729;
+    --border: #2e3033;
+    --accent: #e8ff47;
+    --accent2: #47c8ff;
+    --danger: #ff5a5a;
+    --text: #f0f0ee;
+    --text-muted: #7a7d82;
+    --text-dim: #4a4d52;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.5);
+    --panel-width: 280px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ─────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
+  }
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .lang-toggle {
+    display: flex;
+    background: var(--surface3);
+    border-radius: 20px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .lang-toggle button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .lang-toggle button.active {
+    background: var(--accent);
+    color: #0e0f11;
+    font-weight: 500;
+  }
+  .lang-toggle button .flag { font-size: 1rem; }
+  .lang-toggle button .lang-label { font-size: 0.68rem; }
+
+  .btn-add-files {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--accent);
+    color: #0e0f11;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    font-size: 0.8rem;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+  .btn-add-files:hover { opacity: 0.88; }
+  .btn-add-files:active { transform: scale(0.97); }
+
+  /* ── ACTION BAR ─────────────────────────────── */
+  .action-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .action-bar .sep {
+    width: 1px; height: 22px;
+    background: var(--border);
+    margin: 0 2px;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface3);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 400;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface2); border-color: #444; }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary {
+    background: var(--accent);
+    color: #0e0f11;
+    border-color: var(--accent);
+    font-weight: 500;
+  }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.secondary {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+  .btn.secondary:hover { background: rgba(71,200,255,0.08); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn:disabled:hover { background: var(--surface3); border-color: var(--border); transform: none; }
+
+  .sel-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+  .sel-count span { color: var(--accent); font-weight: 500; }
+
+  /* ── MAIN WORKSPACE ─────────────────────────── */
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── ORGANIZER PANEL ─────────────────────────── */
+  .organizer {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    position: relative;
+  }
+
+  /* Drop Zone */
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    height: calc(100% - 32px);
+    min-height: 300px;
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    color: var(--text-muted);
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(232,255,71,0.03);
+    color: var(--text);
+  }
+  .drop-zone .dz-icon {
+    font-size: 2.5rem;
+    opacity: 0.4;
+  }
+  .drop-zone h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .drop-zone p {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  /* Page Grid */
+  .page-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+    padding-bottom: 20px;
+  }
+
+  .page-card {
+    position: relative;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    overflow: visible;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    user-select: none;
+  }
+  .page-card:hover {
+    border-color: #444;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .page-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), 0 8px 24px rgba(232,255,71,0.12);
+  }
+  .page-card.previewing {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 1px var(--accent2);
+  }
+  .page-card.sortable-ghost {
+    opacity: 0.3;
+  }
+  .page-card.sortable-chosen {
+    cursor: grabbing;
+  }
+
+  .card-thumb {
+    width: 100%;
+    aspect-ratio: 0.707;
+    background: #2a2b2e;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card-thumb canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .card-thumb .thumb-loading {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 7px;
+    gap: 4px;
+  }
+  .card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .card-split-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.6rem;
+    font-family: 'DM Mono', monospace;
+    padding: 2px 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .card-split-btn:hover {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(71,200,255,0.08);
+  }
+
+  /* Delete button */
+  .card-delete {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 20px; height: 20px;
+    background: var(--danger);
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s;
+    z-index: 2;
+  }
+  .page-card:hover .card-delete { opacity: 1; }
+  .card-delete:hover { transform: scale(1.15); }
+
+  /* Checkbox */
+  .card-check {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 18px; height: 18px;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    transition: all 0.15s;
+  }
+  .page-card.selected .card-check {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .card-check::after {
+    content: '✓';
+    font-size: 0.65rem;
+    color: #0e0f11;
+    opacity: 0;
+    transition: opacity 0.1s;
+  }
+  .page-card.selected .card-check::after { opacity: 1; }
+
+  /* Selection order badge */
+  .card-order {
+    position: absolute;
+    top: 6px;
+    right: 28px;
+    background: var(--accent);
+    color: #0e0f11;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    font-weight: 500;
+    padding: 1px 5px;
+    border-radius: 4px;
+    display: none;
+    z-index: 2;
+  }
+  .page-card.selected .card-order { display: block; }
+
+  /* ── RESIZER ─────────────────────────────────── */
+  .resizer {
+    width: 5px;
+    background: var(--border);
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background 0.2s;
+    position: relative;
+    z-index: 5;
+  }
+  .resizer:hover, .resizer.dragging { background: var(--accent); }
+
+  /* ── SPINNER ─────────────────────────────────── */
+  .spinner {
+    width: 28px; height: 28px;
+    border: 3px solid var(--surface3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .preview-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── PREVIEW PANEL ───────────────────────────── */
+  .preview-panel {
+    width: var(--panel-width);
+    min-width: 160px;
+    max-width: 60vw;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .preview-header h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .preview-page-info {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+  }
+
+  .preview-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .preview-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 8px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+  .preview-empty .pe-icon { font-size: 2rem; opacity: 0.3; }
+  .preview-empty p { font-size: 0.75rem; line-height: 1.5; }
+
+  .preview-canvas-wrap {
+    width: 100%;
+    background: #fff;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .preview-canvas-wrap canvas {
+    width: 100% !important;
+    height: auto !important;
+    display: block;
+  }
+
+  .preview-meta {
+    width: 100%;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+
+  /* ── MODAL OVERLAY ───────────────────────────── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.15s ease;
+  }
+  .modal-overlay.hidden { display: none; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 900px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+    animation: slideUp 0.2s ease;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .modal-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── MODAL VIEWER (scrollable page stack) ── */
+  .modal-viewer {
+    flex: 1;
+    overflow-y: auto;
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px;
+    gap: 20px;
+  }
+
+  .modal-page-block {
+    width: 100%;
+    max-width: 760px;
+    position: relative;
+    border-radius: var(--radius);
+    overflow: visible;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    transition: outline 0.15s;
+    outline: 3px solid transparent;
+    background: #fff;
+  }
+  .modal-page-block.active {
+    outline-color: var(--accent2);
+  }
+  .modal-page-block canvas {
+    display: block;
+    width: 100% !important;
+    height: auto !important;
+    border-radius: var(--radius);
+  }
+  .modal-page-block .mpb-label {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    padding: 24px 12px 8px;
+    border-radius: 0 0 var(--radius) var(--radius);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.7);
+    pointer-events: none;
+  }
+  .modal-page-block .mpb-loading {
+    background: var(--surface2);
+    aspect-ratio: 0.707;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── FILMSTRIP ── */
+  .modal-filmstrip-wrap {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 10px 14px;
+  }
+  .modal-filmstrip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .modal-filmstrip::-webkit-scrollbar { height: 4px; }
+  .modal-filmstrip::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+  .film-thumb {
+    flex-shrink: 0;
+    width: 70px;
+    position: relative;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    overflow: visible;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .film-thumb:hover { border-color: #555; transform: translateY(-2px); }
+  .film-thumb.active {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 1px var(--accent2);
+  }
+  .film-thumb.sortable-ghost { opacity: 0.3; }
+  .film-thumb .ft-img {
+    width: 100%;
+    aspect-ratio: 0.707;
+    border-radius: 4px 4px 0 0;
+    overflow: hidden;
+    background: #2a2b2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .film-thumb .ft-img canvas { width: 100%; height: 100%; object-fit: contain; }
+  .film-thumb .ft-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--text-muted);
+    padding: 3px 5px;
+    text-align: center;
+  }
+  .film-thumb .ft-del {
+    position: absolute;
+    top: -6px; right: -6px;
+    width: 16px; height: 16px;
+    background: var(--danger);
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 0.58rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 5;
+  }
+  .film-thumb:hover .ft-del { opacity: 1; }
+
+  .modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 10px;
+  }
+  .modal-footer .page-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .modal-footer .page-count span { color: var(--accent); }
+
+  /* ── TOAST ────────────────────────────────────── */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-family: 'DM Sans', sans-serif;
+    padding: 8px 18px;
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    animation: toastIn 0.25s ease, toastOut 0.25s ease 2.5s forwards;
+    white-space: nowrap;
+  }
+  .toast.success { border-color: var(--accent); color: var(--accent); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+  /* ── SCROLLBARS ─────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a3d42; }
+
+  /* ── HIDDEN FILE INPUT ───────────────────────── */
+  #fileInput { display: none; }
+
+  /* ── PROGRESS BAR ───────────────────────────── */
+  .progress-bar {
+    height: 2px;
+    background: var(--surface3);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<!-- Hidden file input -->
+<input type="file" id="fileInput" multiple accept=".pdf" />
+
+<!-- Header -->
+<header>
+  <div class="logo">PDF<span>Craft</span></div>
+  <div class="header-right">
+    <div class="lang-toggle">
+      <button id="btnEN" class="active" onclick="setLang('en')">
+        <svg width="20" height="14" viewBox="0 0 60 42" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px;flex-shrink:0">
+          <rect width="60" height="42" fill="#B22234"/>
+          <rect y="6" width="60" height="6" fill="#fff"/><rect y="18" width="60" height="6" fill="#fff"/>
+          <rect y="30" width="60" height="6" fill="#fff"/><rect width="26" height="22" fill="#3C3B6E"/>
+          <g fill="#fff">
+            <circle cx="3" cy="3" r="1.3"/><circle cx="8" cy="3" r="1.3"/><circle cx="13" cy="3" r="1.3"/><circle cx="18" cy="3" r="1.3"/><circle cx="23" cy="3" r="1.3"/>
+            <circle cx="5.5" cy="7" r="1.3"/><circle cx="10.5" cy="7" r="1.3"/><circle cx="15.5" cy="7" r="1.3"/><circle cx="20.5" cy="7" r="1.3"/>
+            <circle cx="3" cy="11" r="1.3"/><circle cx="8" cy="11" r="1.3"/><circle cx="13" cy="11" r="1.3"/><circle cx="18" cy="11" r="1.3"/><circle cx="23" cy="11" r="1.3"/>
+            <circle cx="5.5" cy="15" r="1.3"/><circle cx="10.5" cy="15" r="1.3"/><circle cx="15.5" cy="15" r="1.3"/><circle cx="20.5" cy="15" r="1.3"/>
+            <circle cx="3" cy="19" r="1.3"/><circle cx="8" cy="19" r="1.3"/><circle cx="13" cy="19" r="1.3"/><circle cx="18" cy="19" r="1.3"/><circle cx="23" cy="19" r="1.3"/>
+          </g>
+        </svg>
+        <span class="lang-label">EN</span>
+      </button>
+      <button id="btnVI" onclick="setLang('vi')">
+        <svg width="20" height="14" viewBox="0 0 60 42" xmlns="http://www.w3.org/2000/svg" style="border-radius:2px;flex-shrink:0">
+          <rect width="60" height="42" fill="#DA251D"/>
+          <polygon points="30,8 33.5,19 45,19 35.5,25.5 39,36 30,29.5 21,36 24.5,25.5 15,19 26.5,19" fill="#FFFF00"/>
+        </svg>
+        <span class="lang-label">VI</span>
+      </button>
+    </div>
+    <button class="btn-add-files" onclick="document.getElementById('fileInput').click()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span data-i18n="addFiles">Add Files</span>
+    </button>
+  </div>
+</header>
+
+<!-- Progress bar -->
+<div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+
+<!-- Action bar -->
+<div class="action-bar" id="actionBar" style="display:none">
+  <button class="btn" onclick="selectAll()" data-i18n="selectAll">Select All</button>
+  <button class="btn" onclick="inverseSelect()" data-i18n="inverseSelect">Inverse Select</button>
+  <div class="sep"></div>
+  <button class="btn primary" onclick="mergeAll()" data-i18n="mergeAll">Merge All</button>
+  <button class="btn secondary" id="btnMergeSel" onclick="mergeSelected()" disabled data-i18n="mergeSelected">Merge Selected</button>
+  <div class="sep"></div>
+  <span class="sel-count"><span id="selCountNum">0</span> <span data-i18n="selected">selected</span> / <span id="totalCount">0</span> <span data-i18n="pages">pages</span></span>
+</div>
+
+<!-- Workspace -->
+<div class="workspace" id="workspace">
+
+  <!-- Organizer -->
+  <div class="organizer" id="organizer">
+    <!-- Drop zone shown when no pages -->
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="dz-icon">⬆</div>
+      <h2 data-i18n="dropTitle">Drop PDF files here</h2>
+      <p data-i18n="dropSub">or click to browse · multiple files supported</p>
+    </div>
+    <!-- Page grid (hidden initially) -->
+    <div class="page-grid" id="pageGrid" style="display:none"></div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" id="resizer"></div>
+
+  <!-- Preview Panel -->
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-header">
+      <h3 data-i18n="preview">Preview</h3>
+      <span class="preview-page-info" id="previewInfo"></span>
+    </div>
+    <div class="preview-body" id="previewBody">
+      <div class="preview-empty">
+        <div class="pe-icon">👁</div>
+        <p data-i18n="previewEmpty">Click a page<br/>to preview it</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Pre-export preview -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Merge Preview</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <!-- Scrollable full-page viewer -->
+    <div class="modal-viewer" id="modalViewer"></div>
+    <!-- Filmstrip -->
+    <div class="modal-filmstrip-wrap">
+      <div class="modal-filmstrip" id="modalFilmstrip"></div>
+    </div>
+    <div class="modal-footer">
+      <div class="page-count"><span id="modalPageCount">0</span> <span data-i18n="pages">pages</span></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeModal()" data-i18n="cancel">Cancel</button>
+        <button class="btn primary" onclick="exportMerged()" data-i18n="exportPdf">Export PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+// ── i18n ──────────────────────────────────────────────────────────────────────
+const STRINGS = {
+  en: {
+    addFiles: 'Add Files',
+    selectAll: 'Select All',
+    inverseSelect: 'Inverse Select',
+    mergeAll: 'Merge All',
+    mergeSelected: 'Merge Selected',
+    selected: 'selected',
+    pages: 'pages',
+    dropTitle: 'Drop PDF files here',
+    dropSub: 'or click to browse · multiple files supported',
+    preview: 'Preview',
+    previewEmpty: 'Click a page\nto preview it',
+    modalHint: 'Drag pages to reorder · ✕ to remove · then export',
+    cancel: 'Cancel',
+    exportPdf: 'Export PDF',
+    split: 'Split',
+    mergeAllTitle: 'Merge All — Reorder Preview',
+    mergeSelTitle: 'Merge Selected — Reorder Preview',
+    toastExported: 'Exported!',
+    toastNoPages: 'No pages to export.',
+    toastLoading: 'Loading…',
+    page: 'Page',
+    of: 'of',
+    filenamePrompt: 'Save as:',
+  },
+  vi: {
+    addFiles: 'Thêm File',
+    selectAll: 'Chọn Tất Cả',
+    inverseSelect: 'Chọn Còn Lại',
+    mergeAll: 'Nối Tất Cả',
+    mergeSelected: 'Nối Trang Đã Chọn',
+    selected: 'đã chọn',
+    pages: 'trang',
+    dropTitle: 'Thả file PDF vào đây',
+    dropSub: 'hoặc nhấp để duyệt · hỗ trợ nhiều file',
+    preview: 'Xem Trước',
+    previewEmpty: 'Nhấp vào trang\nđể xem trước',
+    modalHint: 'Kéo trang để sắp xếp · ✕ để xoá · rồi xuất file',
+    cancel: 'Huỷ',
+    exportPdf: 'Xuất PDF',
+    split: 'Tách',
+    mergeAllTitle: 'Nối Tất Cả — Xem Trước Thứ Tự',
+    mergeSelTitle: 'Nối Đã Chọn — Xem Trước Thứ Tự',
+    toastExported: 'Đã xuất!',
+    toastNoPages: 'Không có trang nào.',
+    toastLoading: 'Đang tải…',
+    page: 'Trang',
+    of: 'của',
+    filenamePrompt: 'Lưu với tên:',
+  }
+};
+
+let lang = localStorage.getItem('pdfcraft-lang') || 'en';
+function t(key) { return STRINGS[lang][key] || key; }
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('pdfcraft-lang', l);
+  document.getElementById('btnEN').classList.toggle('active', l === 'en');
+  document.getElementById('btnVI').classList.toggle('active', l === 'vi');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (el.tagName === 'INPUT') el.placeholder = t(key);
+    else el.textContent = t(key);
+  });
+  updateSelCount();
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// pages[i] = { id, pdfBytes, pageIndex, fileName, pdfDoc (pdfjsLib), selected, orderNum }
+let pages = [];
+let selectedOrder = []; // tracks selection order
+let previewingId = null;
+let modalSortable = null;
+let modalPages = []; // pages shown in modal
+
+// ── Caches ────────────────────────────────────────────────────────────────────
+const thumbCache = new Map();   // id → canvas (low-res)
+const fullCache  = new Map();   // id → canvas (full-res)
+
+// Apply saved lang (must be after pages declaration)
+setLang(lang);
+
+// ── File input / Drop ─────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  loadFiles(Array.from(e.target.files));
+  e.target.value = '';
+});
+
+const dropZone = document.getElementById('dropZone');
+const organizer = document.getElementById('organizer');
+
+// Prevent Chrome from navigating to dropped files at document level
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  // If dropped outside the organizer, still load PDFs
+  if (!e.target.closest('#organizer')) {
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+    if (files.length) loadFiles(files);
+  }
+});
+
+['dragenter','dragover'].forEach(ev => {
+  organizer.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+});
+['dragleave','drop'].forEach(ev => {
+  organizer.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('drag-over'); });
+});
+organizer.addEventListener('drop', e => {
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+  if (files.length) loadFiles(files);
+});
+
+async function loadFiles(files) {
+  setProgress(5);
+  const total = files.length;
+  let done = 0;
+  for (const file of files) {
+    try {
+      const bytes = await file.arrayBuffer();
+      const pdfBytes = new Uint8Array(bytes);
+      const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
+      for (let i = 0; i < pdfDoc.numPages; i++) {
+        const id = crypto.randomUUID();
+        pages.push({ id, pdfBytes, pageIndex: i, fileName: file.name, pdfDoc, selected: false, orderNum: 0 });
+      }
+    } catch(e) { showToast('Failed: ' + file.name, 'error'); }
+    done++;
+    setProgress(5 + (done / total) * 85);
+  }
+  renderGrid();
+  setProgress(100);
+  setTimeout(() => setProgress(0), 600);
+}
+
+function setProgress(pct) {
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+// ── Grid rendering ────────────────────────────────────────────────────────────
+function renderGrid() {
+  const grid = document.getElementById('pageGrid');
+  const dz = document.getElementById('dropZone');
+  const ab = document.getElementById('actionBar');
+
+  if (pages.length === 0) {
+    dz.style.display = '';
+    grid.style.display = 'none';
+    ab.style.display = 'none';
+    return;
+  }
+
+  dz.style.display = 'none';
+  grid.style.display = '';
+  ab.style.display = '';
+  grid.innerHTML = '';
+
+  pages.forEach((pg, idx) => {
+    const card = document.createElement('div');
+    card.className = 'page-card' + (pg.selected ? ' selected' : '') + (pg.id === previewingId ? ' previewing' : '');
+    card.dataset.id = pg.id;
+
+    card.innerHTML = `
+      <div class="card-check"></div>
+      <div class="card-order" data-order="${pg.orderNum}">${pg.orderNum}</div>
+      <div class="card-thumb" id="thumb-${pg.id}">
+        <span class="thumb-loading">${t('toastLoading')}</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-label" title="${pg.fileName} p.${pg.pageIndex+1}">p.${pg.pageIndex+1} · ${shortName(pg.fileName)}</span>
+        <button class="card-split-btn" title="${t('split')}" onclick="splitPage(event,'${pg.id}')">${t('split')}</button>
+      </div>
+      <button class="card-delete" title="Delete" onclick="deletePage(event,'${pg.id}')">✕</button>
+    `;
+
+    card.addEventListener('click', e => {
+      if (e.target.classList.contains('card-split-btn') || e.target.classList.contains('card-delete')) return;
+      toggleSelect(pg.id);
+    });
+
+    // Hover preview
+    let hoverTimer = null;
+    card.addEventListener('mouseenter', () => {
+      hoverTimer = setTimeout(() => {
+        if (!thumbCache.has(pg.id) && !fullCache.has(pg.id)) return; // nothing to show yet
+        setPreview(pg.id);
+      }, 80);
+    });
+    card.addEventListener('mouseleave', () => {
+      if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+    });
+
+    grid.appendChild(card);
+    renderThumb(pg);
+  });
+
+  // Sortable
+  if (window._sortable) window._sortable.destroy();
+  window._sortable = Sortable.create(grid, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd(evt) {
+      const moved = pages.splice(evt.oldIndex, 1)[0];
+      pages.splice(evt.newIndex, 0, moved);
+      updateSelCount();
+    }
+  });
+
+  updateSelCount();
+}
+
+async function renderThumb(pg) {
+  // If already cached, just populate the card DOM
+  if (thumbCache.has(pg.id)) {
+    const c = document.getElementById('thumb-' + pg.id);
+    if (c) { c.innerHTML = ''; c.appendChild(copyCanvas(thumbCache.get(pg.id))); }
+    return;
+  }
+  try {
+    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
+    const viewport = page.getViewport({ scale: 0.4 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    thumbCache.set(pg.id, canvas);
+    // Update card thumbnail
+    const c = document.getElementById('thumb-' + pg.id);
+    if (c) { c.innerHTML = ''; c.appendChild(copyCanvas(canvas)); }
+    // If this page is the active preview but full isn't cached → kick off full render now
+    if (previewingId === pg.id && !fullCache.has(pg.id) && renderingId !== pg.id) {
+      setPreview(pg.id);
+    }
+  } catch(e) {}
+}
+
+function shortName(name) {
+  return name.length > 12 ? name.slice(0, 10) + '…' : name;
+}
+
+// ── Selection ─────────────────────────────────────────────────────────────────
+function toggleSelect(id) {
+  const pg = pages.find(p => p.id === id);
+  if (!pg) return;
+  if (pg.selected) {
+    pg.selected = false;
+    pg.orderNum = 0;
+    selectedOrder = selectedOrder.filter(x => x !== id);
+    // renumber
+    selectedOrder.forEach((sid, i) => {
+      const p = pages.find(p => p.id === sid);
+      if (p) p.orderNum = i + 1;
+    });
+  } else {
+    pg.selected = true;
+    selectedOrder.push(id);
+    pg.orderNum = selectedOrder.length;
+  }
+  // Update card visually
+  const card = document.querySelector(`.page-card[data-id="${id}"]`);
+  if (card) {
+    card.classList.toggle('selected', pg.selected);
+    card.querySelector('.card-order').textContent = pg.orderNum || '';
+    // renumber all visible orders
+    pages.forEach(p => {
+      const c = document.querySelector(`.page-card[data-id="${p.id}"]`);
+      if (c) c.querySelector('.card-order').textContent = p.orderNum || '';
+    });
+  }
+  updateSelCount();
+  // preview on select — show spinner immediately if nothing cached yet
+  if (!thumbCache.has(id) && !fullCache.has(id)) {
+    // Show loading state immediately — renderThumb will upgrade it
+    previewingId = id;
+    document.querySelectorAll('.page-card').forEach(c => c.classList.remove('previewing'));
+    const card2 = document.querySelector(`.page-card[data-id="${id}"]`);
+    if (card2) card2.classList.add('previewing');
+    document.getElementById('previewInfo').textContent = `${t('page')} ${pg.pageIndex + 1} ${t('of')} ${pg.pdfDoc.numPages}`;
+    document.getElementById('previewBody').innerHTML = `<div class="preview-loading"><div class="spinner"></div><span>${t('toastLoading')}</span></div>`;
+  } else {
+    setPreview(id);
+  }
+}
+
+function selectAll() {
+  selectedOrder = [];
+  pages.forEach(pg => {
+    pg.selected = true;
+    selectedOrder.push(pg.id);
+    pg.orderNum = selectedOrder.length;
+  });
+  refreshCardStates();
+  updateSelCount();
+}
+
+function inverseSelect() {
+  selectedOrder = [];
+  pages.forEach(pg => {
+    pg.selected = !pg.selected;
+  });
+  pages.forEach(pg => {
+    if (pg.selected) selectedOrder.push(pg.id);
+    else pg.orderNum = 0;
+  });
+  selectedOrder.forEach((id, i) => {
+    const pg = pages.find(p => p.id === id);
+    if (pg) pg.orderNum = i + 1;
+  });
+  refreshCardStates();
+  updateSelCount();
+}
+
+function refreshCardStates() {
+  pages.forEach(pg => {
+    const card = document.querySelector(`.page-card[data-id="${pg.id}"]`);
+    if (!card) return;
+    card.classList.toggle('selected', pg.selected);
+    card.querySelector('.card-order').textContent = pg.orderNum || '';
+  });
+}
+
+function updateSelCount() {
+  const selCount = pages.filter(p => p.selected).length;
+  document.getElementById('selCountNum').textContent = selCount;
+  document.getElementById('totalCount').textContent = pages.length;
+  document.getElementById('btnMergeSel').disabled = selCount === 0;
+}
+
+// ── Canvas copy helper (cloneNode doesn't copy pixel data) ───────────────────
+function copyCanvas(src) {
+  const dst = document.createElement('canvas');
+  dst.width = src.width;
+  dst.height = src.height;
+  dst.getContext('2d').drawImage(src, 0, 0);
+  return dst;
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+let renderingId = null; // tracks which page is currently being full-rendered
+
+function showThumbInPreview(pg) {
+  const body = document.getElementById('previewBody');
+  const thumbCanvas = thumbCache.get(pg.id);
+  if (!thumbCanvas) return;
+  body.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'preview-canvas-wrap';
+  wrap.style.position = 'relative';
+  wrap.appendChild(copyCanvas(thumbCanvas));
+  const spinWrap = document.createElement('div');
+  spinWrap.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);';
+  spinWrap.innerHTML = '<div class="spinner"></div>';
+  wrap.appendChild(spinWrap);
+  body.appendChild(wrap);
+}
+
+async function setPreview(id) {
+  const pg = pages.find(p => p.id === id);
+  if (!pg) return;
+
+  // State 1: nothing cached yet → show nothing
+  if (!thumbCache.has(pg.id) && !fullCache.has(pg.id)) return;
+
+  // Update active card border
+  previewingId = id;
+  document.querySelectorAll('.page-card').forEach(c => c.classList.remove('previewing'));
+  const card = document.querySelector(`.page-card[data-id="${id}"]`);
+  if (card) card.classList.add('previewing');
+  document.getElementById('previewInfo').textContent = `${t('page')} ${pg.pageIndex + 1} ${t('of')} ${pg.pdfDoc.numPages}`;
+
+  const body = document.getElementById('previewBody');
+
+  // State 3: full already cached → show instantly, done
+  if (fullCache.has(pg.id)) {
+    body.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-canvas-wrap';
+    wrap.appendChild(copyCanvas(fullCache.get(pg.id)));
+    body.appendChild(wrap);
+    appendPreviewMeta(body, pg);
+    return;
+  }
+
+  // State 2: thumb ready, full not cached yet
+  // If already rendering this page, just show thumb+spinner and wait
+  showThumbInPreview(pg);
+  if (renderingId === id) return; // already in progress, thumb shown, will upgrade when done
+
+  // Start full render
+  renderingId = id;
+  try {
+    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
+    const panelEl = document.getElementById('previewPanel');
+    const panelW = Math.min((panelEl ? panelEl.offsetWidth - 28 : 600), 800);
+    const safeW = panelW > 50 ? panelW : 600;
+    const baseVP = page.getViewport({ scale: 1 });
+    const scale = safeW / baseVP.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    fullCache.set(pg.id, canvas);
+    renderingId = null;
+
+    // Only update display if this page is still the active preview
+    if (previewingId !== id) return;
+    body.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-canvas-wrap';
+    wrap.appendChild(copyCanvas(canvas));
+    body.appendChild(wrap);
+    appendPreviewMeta(body, pg);
+  } catch(e) {
+    renderingId = null;
+    if (previewingId === id) {
+      body.innerHTML = `<div style="color:var(--danger);font-size:0.75rem">Error loading preview</div>`;
+    }
+  }
+}
+
+function appendPreviewMeta(body, pg) {
+  const meta = document.createElement('div');
+  meta.className = 'preview-meta';
+  meta.innerHTML = `📄 ${pg.fileName}<br/>🔢 ${t('page')} ${pg.pageIndex + 1} / ${pg.pdfDoc.numPages}`;
+  body.appendChild(meta);
+}
+
+// ── Delete / Split ────────────────────────────────────────────────────────────
+function deletePage(e, id) {
+  e.stopPropagation();
+  pages = pages.filter(p => p.id !== id);
+  selectedOrder = selectedOrder.filter(x => x !== id);
+  if (previewingId === id) {
+    previewingId = null;
+    document.getElementById('previewBody').innerHTML = `<div class="preview-empty"><div class="pe-icon">👁</div><p>${t('previewEmpty')}</p></div>`;
+    document.getElementById('previewInfo').textContent = '';
+  }
+  renderGrid();
+}
+
+async function splitPage(e, id) {
+  e.stopPropagation();
+  const pg = pages.find(p => p.id === id);
+  if (!pg) return;
+  const defaultName = `page-${pg.pageIndex + 1}-${pg.fileName}`;
+  const filename = prompt(t('filenamePrompt'), defaultName);
+  if (filename === null) return;
+  const finalName = (filename.trim() || defaultName).replace(/\.pdf$/i,'') + '.pdf';
+  try {
+    const srcDoc = await PDFLib.PDFDocument.load(pg.pdfBytes);
+    const newDoc = await PDFLib.PDFDocument.create();
+    const [copied] = await newDoc.copyPages(srcDoc, [pg.pageIndex]);
+    newDoc.addPage(copied);
+    const outBytes = await newDoc.save();
+    downloadPDF(outBytes, finalName);
+    showToast(t('toastExported'), 'success');
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── Merge ─────────────────────────────────────────────────────────────────────
+function mergeAll() {
+  if (pages.length === 0) { showToast(t('toastNoPages')); return; }
+  // order = left-to-right grid order
+  openModal(pages.map((p, i) => ({ ...p, _selIdx: i })), t('mergeAllTitle'));
+}
+
+function mergeSelected() {
+  const sel = selectedOrder.map(id => pages.find(p => p.id === id)).filter(Boolean);
+  if (sel.length === 0) { showToast(t('toastNoPages')); return; }
+  openModal(sel, t('mergeSelTitle'));
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+let filmSortable = null;
+let activeModalIdx = 0;
+
+function openModal(pagesArr, title) {
+  modalPages = pagesArr.map(p => ({ ...p }));
+  document.getElementById('modalTitle').textContent = title;
+  activeModalIdx = 0;
+  renderModalFull();
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.add('hidden');
+  modalPages = [];
+  if (filmSortable) { filmSortable.destroy(); filmSortable = null; }
+}
+
+function renderModalFull() {
+  renderModalViewer();
+  renderModalFilmstrip();
+  document.getElementById('modalPageCount').textContent = modalPages.length;
+}
+
+function renderModalViewer() {
+  const viewer = document.getElementById('modalViewer');
+  viewer.innerHTML = '';
+
+  modalPages.forEach((pg, idx) => {
+    const block = document.createElement('div');
+    block.className = 'modal-page-block' + (idx === activeModalIdx ? ' active' : '');
+    block.dataset.idx = idx;
+    block.id = `mpb-${idx}`;
+
+    // Loading placeholder
+    const loadDiv = document.createElement('div');
+    loadDiv.className = 'mpb-loading';
+    loadDiv.innerHTML = '<div class="spinner"></div>';
+    block.appendChild(loadDiv);
+
+    const label = document.createElement('div');
+    label.className = 'mpb-label';
+    label.textContent = `${idx + 1} · ${shortName(pg.fileName)} p.${pg.pageIndex + 1}`;
+    block.appendChild(label);
+
+    // Hover → highlight filmstrip
+    block.addEventListener('mouseenter', () => setActiveModalIdx(idx, false));
+
+    viewer.appendChild(block);
+    renderModalPageFull(pg, idx);
+  });
+
+  // Scroll listener → update active on scroll
+  viewer.addEventListener('scroll', onModalViewerScroll);
+}
+
+function onModalViewerScroll() {
+  const viewer = document.getElementById('modalViewer');
+  const viewerRect = viewer.getBoundingClientRect();
+  const centerY = viewerRect.top + viewerRect.height / 2;
+  let closest = 0, closestDist = Infinity;
+  modalPages.forEach((_, idx) => {
+    const block = document.getElementById(`mpb-${idx}`);
+    if (!block) return;
+    const r = block.getBoundingClientRect();
+    const dist = Math.abs((r.top + r.bottom) / 2 - centerY);
+    if (dist < closestDist) { closestDist = dist; closest = idx; }
+  });
+  if (closest !== activeModalIdx) setActiveModalIdx(closest, false);
+}
+
+function setActiveModalIdx(idx, scrollViewer = true) {
+  activeModalIdx = idx;
+  // Highlight viewer block
+  document.querySelectorAll('.modal-page-block').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  // Highlight filmstrip thumb
+  document.querySelectorAll('.film-thumb').forEach((t, i) => {
+    t.classList.toggle('active', i === idx);
+  });
+  // Scroll filmstrip to show active thumb
+  const strip = document.getElementById('modalFilmstrip');
+  const thumb = strip.querySelector(`.film-thumb[data-idx="${idx}"]`);
+  if (thumb) thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  // Optionally scroll viewer
+  if (scrollViewer) {
+    const block = document.getElementById(`mpb-${idx}`);
+    if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+async function renderModalPageFull(pg, idx) {
+  const block = document.getElementById(`mpb-${idx}`);
+  if (!block) return;
+  try {
+    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
+    const rotation = page.rotate || 0;
+    const baseVP = page.getViewport({ scale: 1, rotation });
+    // Use viewer width minus padding, fallback to 720
+    const viewer = document.getElementById('modalViewer');
+    const maxW = Math.min((viewer ? viewer.offsetWidth - 48 : 720), 760);
+    const scale = (maxW > 0 ? maxW : 720) / baseVP.width;
+    const viewport = page.getViewport({ scale, rotation });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    if (!block.isConnected) return;
+    block.querySelector('.mpb-loading')?.remove();
+    // Insert canvas before label
+    const label = block.querySelector('.mpb-label');
+    if (label) block.insertBefore(canvas, label);
+    else block.appendChild(canvas);
+  } catch(e) { console.error('modal page render error', e); }
+}
+
+function renderModalFilmstrip() {
+  const strip = document.getElementById('modalFilmstrip');
+  strip.innerHTML = '';
+
+  modalPages.forEach((pg, idx) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'film-thumb' + (idx === activeModalIdx ? ' active' : '');
+    thumb.dataset.idx = idx;
+    thumb.innerHTML = `
+      <div class="ft-img" id="fthumb-${idx}"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div></div>
+      <div class="ft-num">${idx + 1}</div>
+      <button class="ft-del" onclick="modalFilmDelete(event,${idx})">✕</button>
+    `;
+    thumb.addEventListener('click', () => setActiveModalIdx(idx, true));
+    strip.appendChild(thumb);
+    renderFilmThumb(pg, idx);
+  });
+
+  if (filmSortable) filmSortable.destroy();
+  filmSortable = Sortable.create(strip, {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    onEnd(evt) {
+      const moved = modalPages.splice(evt.oldIndex, 1)[0];
+      modalPages.splice(evt.newIndex, 0, moved);
+      // Rerender both after reorder
+      activeModalIdx = evt.newIndex;
+      renderModalFull();
+    }
+  });
+}
+
+async function renderFilmThumb(pg, idx) {
+  const container = document.getElementById(`fthumb-${idx}`);
+  if (!container) return;
+  // Use cached thumb if available
+  if (thumbCache.has(pg.id)) {
+    container.innerHTML = '';
+    container.appendChild(copyCanvas(thumbCache.get(pg.id)));
+    return;
+  }
+  try {
+    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
+    const viewport = page.getViewport({ scale: 0.3 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    if (!container.isConnected) return;
+    container.innerHTML = '';
+    container.appendChild(canvas);
+  } catch(e) {}
+}
+
+function modalFilmDelete(e, idx) {
+  e.stopPropagation();
+  modalPages.splice(idx, 1);
+  if (activeModalIdx >= modalPages.length) activeModalIdx = Math.max(0, modalPages.length - 1);
+  renderModalFull();
+}
+
+async function exportMerged() {
+  if (modalPages.length === 0) { showToast(t('toastNoPages')); return; }
+  const defaultName = 'merged.pdf';
+  const filename = prompt(t('filenamePrompt'), defaultName);
+  if (filename === null) return;
+  const finalName = (filename.trim() || defaultName).replace(/\.pdf$/i,'') + '.pdf';
+  try {
+    const newDoc = await PDFLib.PDFDocument.create();
+    for (const pg of modalPages) {
+      const srcDoc = await PDFLib.PDFDocument.load(pg.pdfBytes);
+      const [copied] = await newDoc.copyPages(srcDoc, [pg.pageIndex]);
+      newDoc.addPage(copied);
+    }
+    const outBytes = await newDoc.save();
+    downloadPDF(outBytes, finalName);
+    showToast(t('toastExported'), 'success');
+    closeModal();
+  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function downloadPDF(bytes, name) {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function showToast(msg, type = '') {
+  const tc = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  tc.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ── Resizer ───────────────────────────────────────────────────────────────────
+(function() {
+  const resizer = document.getElementById('resizer');
+  const panel = document.getElementById('previewPanel');
+  const workspace = document.getElementById('workspace');
+  let dragging = false, startX = 0, startW = 0;
+
+  resizer.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startW = panel.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta = startX - e.clientX;
+    const newW = Math.max(160, Math.min(startW + delta, workspace.offsetWidth * 0.6));
+    panel.style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    // Re-render preview at new size
+    if (previewingId) setPreview(previewingId);
+  });
+})();
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+</script>
+</body>
+</html>

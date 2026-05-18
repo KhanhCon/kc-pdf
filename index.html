@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>PDFCraft — PDF Tools</title>
 
-<!-- PDF.js -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<!-- pdf-lib -->
+<!-- pdf-lib for merge/split/export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <!-- SortableJS for drag-reorder -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
@@ -920,7 +918,52 @@
 <!-- Toast container -->
 <div class="toast-container" id="toastContainer"></div>
 
+<!-- Service Worker registration for WASM caching -->
 <script>
+if ('serviceWorker' in navigator) {
+  // Inline service worker as a blob to avoid needing a separate sw.js file
+  const swCode = `
+const CACHE = 'pdfcraft-v1';
+const WASM_URL = './mupdf-wasm.wasm';
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.add(WASM_URL)).catch(() => {})
+  );
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(clients.claim());
+});
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('mupdf-wasm.wasm')) {
+    e.respondWith(
+      caches.open(CACHE).then(async c => {
+        const cached = await c.match(e.request);
+        if (cached) return cached;
+        const res = await fetch(e.request);
+        c.put(e.request, res.clone());
+        return res;
+      })
+    );
+  }
+});
+`;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl, { scope: './' }).catch(() => {});
+}
+</script>
+
+<script type="module">
+// ── MuPDF init ────────────────────────────────────────────────────────────────
+// mupdf-wasm.js reads globalThis["$libmupdf_wasm_Module"] for config.
+// Set locateFile BEFORE importing mupdf.js so the WASM binary is fetched
+// from ./mupdf-wasm.wasm (local GitHub Pages) instead of jsdelivr.
+globalThis['$libmupdf_wasm_Module'] = {
+  locateFile: (file, prefix) => './' + file
+};
+import * as mupdf from 'https://cdn.jsdelivr.net/npm/mupdf@1.27.0/dist/mupdf.js';
+
 // ── i18n ──────────────────────────────────────────────────────────────────────
 const STRINGS = {
   en: {
@@ -934,7 +977,7 @@ const STRINGS = {
     dropTitle: 'Drop PDF files here',
     dropSub: 'or click to browse · multiple files supported',
     preview: 'Preview',
-    previewEmpty: 'Click a page\nto preview it',
+    previewEmpty: 'Hover a page\nto preview it',
     modalHint: 'Drag pages to reorder · ✕ to remove · then export',
     cancel: 'Cancel',
     exportPdf: 'Export PDF',
@@ -961,7 +1004,7 @@ const STRINGS = {
     dropTitle: 'Thả file PDF vào đây',
     dropSub: 'hoặc nhấp để duyệt · hỗ trợ nhiều file',
     preview: 'Xem Trước',
-    previewEmpty: 'Nhấp vào trang\nđể xem trước',
+    previewEmpty: 'Di chuột vào trang\nđể xem trước',
     modalHint: 'Kéo trang để sắp xếp · ✕ để xoá · rồi xuất file',
     cancel: 'Huỷ',
     exportPdf: 'Xuất PDF',
@@ -995,25 +1038,61 @@ function setLang(l) {
   updateSelCount();
 }
 
-// ── State ─────────────────────────────────────────────────────────────────────
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Expose setLang globally so onclick= attributes work
+window.setLang = setLang;
 
-// pages[i] = { id, pdfBytes, pageIndex, fileName, pdfDoc (pdfjsLib), selected, orderNum }
+// ── State ─────────────────────────────────────────────────────────────────────
+// pages[i] = { id, pdfBytes, pageIndex, fileName, mupdfDoc, selected, orderNum }
 let pages = [];
-let selectedOrder = []; // tracks selection order
+let selectedOrder = [];
 let previewingId = null;
-let modalSortable = null;
-let modalPages = []; // pages shown in modal
+let modalPages = [];
 
 // ── Caches ────────────────────────────────────────────────────────────────────
-const thumbCache = new Map();   // id → canvas (low-res)
-const fullCache  = new Map();   // id → canvas (full-res)
+const thumbCache = new Map();   // id → canvas (low-res, rendered by MuPDF)
+const fullCache  = new Map();   // id → canvas (full-res, rendered by MuPDF)
 
 // Apply saved lang (must be after pages declaration)
 setLang(lang);
 
-// ── File input / Drop ─────────────────────────────────────────────────────────
+// ── MuPDF rendering helpers ───────────────────────────────────────────────────
+function mupdfRenderPage(mupdfDoc, pageIndex, scale) {
+  const page = mupdfDoc.loadPage(pageIndex);
+  try {
+    const matrix = mupdf.Matrix.scale(scale, scale);
+    // alpha=false → RGB (3 bytes/px), showExtras=true includes annotations
+    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
+    try {
+      const w = pixmap.getWidth();
+      const h = pixmap.getHeight();
+      const pixels = pixmap.getPixels(); // Uint8ClampedArray, RGB stride
+      const stride = Math.floor(pixels.length / h); // bytes per row
+      // Convert RGB stride data to tight RGBA for ImageData
+      const rgba = new Uint8ClampedArray(w * h * 4);
+      for (let row = 0; row < h; row++) {
+        for (let col = 0; col < w; col++) {
+          const src = row * stride + col * 3;
+          const dst = (row * w + col) * 4;
+          rgba[dst]   = pixels[src];
+          rgba[dst+1] = pixels[src+1];
+          rgba[dst+2] = pixels[src+2];
+          rgba[dst+3] = 255;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').putImageData(new ImageData(rgba, w, h), 0, 0);
+      return canvas;
+    } finally {
+      pixmap.destroy();
+    }
+  } finally {
+    page.destroy();
+  }
+}
+
+// ── File loading ──────────────────────────────────────────────────────────────
 document.getElementById('fileInput').addEventListener('change', e => {
   loadFiles(Array.from(e.target.files));
   e.target.value = '';
@@ -1044,7 +1123,7 @@ organizer.addEventListener('drop', e => {
   if (files.length) loadFiles(files);
 });
 
-// ── Loading overlay helpers ───────────────────────────────────────────────────
+// ── File input / Drop ─────────────────────────────────────────────────────────
 function showLoadingOverlay(msg) {
   const ov = document.getElementById('loadingOverlay');
   ov.classList.remove('hidden');
@@ -1065,7 +1144,7 @@ async function loadFiles(files) {
 
   showLoadingOverlay(t('loading'));
 
-  // Step 1: Parse all PDFs and collect pages
+  // Step 1: Parse all PDFs and collect pages using MuPDF
   const newPages = [];
   for (let fi = 0; fi < pdfFiles.length; fi++) {
     const file = pdfFiles[fi];
@@ -1076,15 +1155,28 @@ async function loadFiles(files) {
     try {
       const bytes = await file.arrayBuffer();
       const pdfBytes = new Uint8Array(bytes);
-      const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
-      for (let i = 0; i < pdfDoc.numPages; i++) {
+      // Open with MuPDF (for rendering)
+      const mupdfDoc = mupdf.Document.openDocument(pdfBytes.buffer, 'application/pdf');
+      const numPages = mupdfDoc.countPages();
+      for (let i = 0; i < numPages; i++) {
         const id = crypto.randomUUID();
-        newPages.push({ id, pdfBytes, pageIndex: i, fileName: file.name, pdfDoc, selected: false, orderNum: 0 });
+        newPages.push({
+          id,
+          pdfBytes,           // raw bytes for pdf-lib export
+          pageIndex: i,       // 0-indexed
+          fileName: file.name,
+          mupdfDoc,           // MuPDF doc for rendering
+          numPages,
+          selected: false,
+          orderNum: 0
+        });
       }
-    } catch(e) { showToast('Failed: ' + file.name, 'error'); }
+    } catch(e) {
+      console.error(e);
+      showToast('Failed: ' + file.name, 'error');
+    }
   }
 
-  // Add to global pages
   pages.push(...newPages);
 
   // Step 2: Render ALL thumbnails before showing grid
@@ -1107,14 +1199,15 @@ async function loadFiles(files) {
 async function renderThumbForPage(pg) {
   if (thumbCache.has(pg.id)) return;
   try {
-    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
-    const viewport = page.getViewport({ scale: 0.4 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    // Scale to ~150px wide for thumbnails
+    const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+    const bounds = page.getBounds();
+    page.destroy();
+    const w = bounds[2] - bounds[0];
+    const scale = 150 / w;
+    const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
     thumbCache.set(pg.id, canvas);
-  } catch(e) {}
+  } catch(e) { console.error('thumb render error', e); }
 }
 
 // ── Grid rendering ────────────────────────────────────────────────────────────
@@ -1286,17 +1379,16 @@ let renderingId = null;
 async function setPreview(id) {
   const pg = pages.find(p => p.id === id);
   if (!pg) return;
-  if (previewingId === id && fullCache.has(id)) return; // already showing full
+  if (previewingId === id && fullCache.has(id)) return;
 
   previewingId = id;
   document.querySelectorAll('.page-card').forEach(c => c.classList.remove('previewing'));
   const card = document.querySelector(`.page-card[data-id="${id}"]`);
   if (card) card.classList.add('previewing');
-  document.getElementById('previewInfo').textContent = `${t('page')} ${pg.pageIndex + 1} ${t('of')} ${pg.pdfDoc.numPages}`;
+  document.getElementById('previewInfo').textContent = `${t('page')} ${pg.pageIndex + 1} ${t('of')} ${pg.numPages}`;
 
   const body = document.getElementById('previewBody');
 
-  // Full already cached → instant
   if (fullCache.has(id)) {
     body.innerHTML = '';
     const wrap = document.createElement('div');
@@ -1307,26 +1399,23 @@ async function setPreview(id) {
     return;
   }
 
-  // Show spinner while rendering
   body.innerHTML = `<div class="preview-loading"><div class="spinner"></div></div>`;
-
-  // If already rendering this page, just wait — it will update on completion
   if (renderingId === id) return;
   renderingId = id;
 
   try {
-    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
     const panelEl = document.getElementById('previewPanel');
     const panelW = Math.min((panelEl ? panelEl.offsetWidth - 28 : 600), 800);
     const safeW = panelW > 50 ? panelW : 600;
-    const rotation = page.rotate || 0;
-    const baseVP = page.getViewport({ scale: 1, rotation });
-    const scale = safeW / baseVP.width;
-    const viewport = page.getViewport({ scale, rotation });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+    // Get page natural width to compute scale
+    const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+    const bounds = page.getBounds();
+    page.destroy();
+    const naturalW = bounds[2] - bounds[0];
+    const scale = safeW / naturalW;
+
+    const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
     fullCache.set(id, canvas);
     renderingId = null;
 
@@ -1347,7 +1436,7 @@ async function setPreview(id) {
 function appendPreviewMeta(body, pg) {
   const meta = document.createElement('div');
   meta.className = 'preview-meta';
-  meta.innerHTML = `📄 ${pg.fileName}<br/>🔢 ${t('page')} ${pg.pageIndex + 1} / ${pg.pdfDoc.numPages}`;
+  meta.innerHTML = `📄 ${pg.fileName}<br/>🔢 ${t('page')} ${pg.pageIndex + 1} / ${pg.numPages}`;
   body.appendChild(meta);
 }
 
@@ -1492,21 +1581,19 @@ async function renderModalPageFull(pg, idx) {
   const block = document.getElementById(`mpb-${idx}`);
   if (!block) return;
   try {
-    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
-    const rotation = page.rotate || 0;
-    const baseVP = page.getViewport({ scale: 1, rotation });
-    // Use viewer width minus padding, fallback to 720
     const viewer = document.getElementById('modalViewer');
     const maxW = Math.min((viewer ? viewer.offsetWidth - 48 : 720), 760);
-    const scale = (maxW > 0 ? maxW : 720) / baseVP.width;
-    const viewport = page.getViewport({ scale, rotation });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    const safeW = maxW > 0 ? maxW : 720;
+
+    const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+    const bounds = page.getBounds();
+    page.destroy();
+    const naturalW = bounds[2] - bounds[0];
+    const scale = safeW / naturalW;
+
+    const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
     if (!block.isConnected) return;
     block.querySelector('.mpb-loading')?.remove();
-    // Insert canvas before label
     const label = block.querySelector('.mpb-label');
     if (label) block.insertBefore(canvas, label);
     else block.appendChild(canvas);
@@ -1555,12 +1642,12 @@ async function renderFilmThumb(pg, idx) {
     return;
   }
   try {
-    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
-    const viewport = page.getViewport({ scale: 0.3 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+    const bounds = page.getBounds();
+    page.destroy();
+    const w = bounds[2] - bounds[0];
+    const scale = 70 / w; // filmstrip thumb ~70px wide
+    const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
     if (!container.isConnected) return;
     container.innerHTML = '';
     container.appendChild(canvas);
@@ -1641,14 +1728,24 @@ function showToast(msg, type = '') {
     resizer.classList.remove('dragging');
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    // Re-render preview at new size
-    if (previewingId) setPreview(previewingId);
+    // Re-render preview at new size (clear full cache for current page)
+    if (previewingId) {
+      fullCache.delete(previewingId);
+      setPreview(previewingId);
+    }
   });
 })();
 
 // Close modal on overlay click
 document.getElementById('modalOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+// ── Expose globals for inline onclick= attributes ─────────────────────────────
+Object.assign(window, {
+  setLang, selectAll, inverseSelect, mergeAll, mergeSelected,
+  closeModal, exportMerged, splitPage, deletePage,
+  modalFilmDelete,
 });
 </script>
 </body>

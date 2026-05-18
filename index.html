@@ -420,11 +420,60 @@
     font-family: 'DM Mono', monospace;
   }
 
+  /* ── LOADING OVERLAY ─────────────────────────── */
+  .loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(14,15,17,0.92);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    backdrop-filter: blur(6px);
+  }
+  .loading-overlay.hidden { display: none; }
+  .loading-overlay .lo-spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--surface3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-overlay .lo-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .loading-overlay .lo-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    min-width: 220px;
+    text-align: center;
+  }
+  .loading-overlay .lo-bar-wrap {
+    width: 280px;
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .loading-overlay .lo-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.2s ease;
+    width: 0%;
+  }
+
   /* ── PREVIEW PANEL ───────────────────────────── */
   .preview-panel {
-    width: var(--panel-width);
-    min-width: 160px;
-    max-width: 60vw;
+    width: 35%;
+    min-width: 200px;
+    max-width: 70vw;
     background: var(--surface);
     border-left: 1px solid var(--border);
     display: flex;
@@ -837,6 +886,14 @@
   </div>
 </div>
 
+<!-- Loading overlay -->
+<div class="loading-overlay hidden" id="loadingOverlay">
+  <div class="lo-spinner"></div>
+  <div class="lo-title" data-i18n="loading">Loading…</div>
+  <div class="lo-sub" id="loadingStatus">Preparing…</div>
+  <div class="lo-bar-wrap"><div class="lo-bar" id="loadingBar"></div></div>
+</div>
+
 <!-- Modal: Pre-export preview -->
 <div class="modal-overlay hidden" id="modalOverlay">
   <div class="modal">
@@ -890,6 +947,8 @@ const STRINGS = {
     page: 'Page',
     of: 'of',
     filenamePrompt: 'Save as:',
+    loading: 'Loading PDF…',
+    loadingPage: 'Rendering page',
   },
   vi: {
     addFiles: 'Thêm File',
@@ -915,6 +974,8 @@ const STRINGS = {
     page: 'Trang',
     of: 'của',
     filenamePrompt: 'Lưu với tên:',
+    loading: 'Đang tải PDF…',
+    loadingPage: 'Đang render trang',
   }
 };
 
@@ -983,30 +1044,77 @@ organizer.addEventListener('drop', e => {
   if (files.length) loadFiles(files);
 });
 
+// ── Loading overlay helpers ───────────────────────────────────────────────────
+function showLoadingOverlay(msg) {
+  const ov = document.getElementById('loadingOverlay');
+  ov.classList.remove('hidden');
+  document.getElementById('loadingStatus').textContent = msg || '…';
+  document.getElementById('loadingBar').style.width = '0%';
+}
+function setLoadingProgress(pct, msg) {
+  document.getElementById('loadingBar').style.width = pct + '%';
+  if (msg) document.getElementById('loadingStatus').textContent = msg;
+}
+function hideLoadingOverlay() {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
 async function loadFiles(files) {
-  setProgress(5);
-  const total = files.length;
-  let done = 0;
-  for (const file of files) {
+  const pdfFiles = Array.from(files).filter(f => f.type === 'application/pdf' || f.name.endsWith('.pdf'));
+  if (!pdfFiles.length) return;
+
+  showLoadingOverlay(t('loading'));
+
+  // Step 1: Parse all PDFs and collect pages
+  const newPages = [];
+  for (let fi = 0; fi < pdfFiles.length; fi++) {
+    const file = pdfFiles[fi];
+    setLoadingProgress(
+      (fi / pdfFiles.length) * 20,
+      `${t('loading')} ${fi + 1}/${pdfFiles.length}: ${file.name}`
+    );
     try {
       const bytes = await file.arrayBuffer();
       const pdfBytes = new Uint8Array(bytes);
       const pdfDoc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
       for (let i = 0; i < pdfDoc.numPages; i++) {
         const id = crypto.randomUUID();
-        pages.push({ id, pdfBytes, pageIndex: i, fileName: file.name, pdfDoc, selected: false, orderNum: 0 });
+        newPages.push({ id, pdfBytes, pageIndex: i, fileName: file.name, pdfDoc, selected: false, orderNum: 0 });
       }
     } catch(e) { showToast('Failed: ' + file.name, 'error'); }
-    done++;
-    setProgress(5 + (done / total) * 85);
   }
+
+  // Add to global pages
+  pages.push(...newPages);
+
+  // Step 2: Render ALL thumbnails before showing grid
+  const total = newPages.length;
+  for (let i = 0; i < total; i++) {
+    const pg = newPages[i];
+    setLoadingProgress(
+      20 + ((i / total) * 78),
+      `${t('loadingPage')} ${i + 1} / ${total}`
+    );
+    await renderThumbForPage(pg);
+  }
+
+  setLoadingProgress(100, '✓');
   renderGrid();
-  setProgress(100);
-  setTimeout(() => setProgress(0), 600);
+  await new Promise(r => setTimeout(r, 300));
+  hideLoadingOverlay();
 }
 
-function setProgress(pct) {
-  document.getElementById('progressFill').style.width = pct + '%';
+async function renderThumbForPage(pg) {
+  if (thumbCache.has(pg.id)) return;
+  try {
+    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
+    const viewport = page.getViewport({ scale: 0.4 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    thumbCache.set(pg.id, canvas);
+  } catch(e) {}
 }
 
 // ── Grid rendering ────────────────────────────────────────────────────────────
@@ -1027,7 +1135,7 @@ function renderGrid() {
   ab.style.display = '';
   grid.innerHTML = '';
 
-  pages.forEach((pg, idx) => {
+  pages.forEach((pg) => {
     const card = document.createElement('div');
     card.className = 'page-card' + (pg.selected ? ' selected' : '') + (pg.id === previewingId ? ' previewing' : '');
     card.dataset.id = pg.id;
@@ -1035,9 +1143,7 @@ function renderGrid() {
     card.innerHTML = `
       <div class="card-check"></div>
       <div class="card-order" data-order="${pg.orderNum}">${pg.orderNum}</div>
-      <div class="card-thumb" id="thumb-${pg.id}">
-        <span class="thumb-loading">${t('toastLoading')}</span>
-      </div>
+      <div class="card-thumb" id="thumb-${pg.id}"></div>
       <div class="card-footer">
         <span class="card-label" title="${pg.fileName} p.${pg.pageIndex+1}">p.${pg.pageIndex+1} · ${shortName(pg.fileName)}</span>
         <button class="card-split-btn" title="${t('split')}" onclick="splitPage(event,'${pg.id}')">${t('split')}</button>
@@ -1045,25 +1151,27 @@ function renderGrid() {
       <button class="card-delete" title="Delete" onclick="deletePage(event,'${pg.id}')">✕</button>
     `;
 
+    // Paint cached thumb
+    if (thumbCache.has(pg.id)) {
+      const el = card.querySelector('#thumb-' + pg.id);
+      el.appendChild(copyCanvas(thumbCache.get(pg.id)));
+    }
+
     card.addEventListener('click', e => {
       if (e.target.classList.contains('card-split-btn') || e.target.classList.contains('card-delete')) return;
       toggleSelect(pg.id);
     });
 
-    // Hover preview
+    // Hover preview — thumbs always ready so just trigger preview
     let hoverTimer = null;
     card.addEventListener('mouseenter', () => {
-      hoverTimer = setTimeout(() => {
-        if (!thumbCache.has(pg.id) && !fullCache.has(pg.id)) return; // nothing to show yet
-        setPreview(pg.id);
-      }, 80);
+      hoverTimer = setTimeout(() => setPreview(pg.id), 80);
     });
     card.addEventListener('mouseleave', () => {
       if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
     });
 
     grid.appendChild(card);
-    renderThumb(pg);
   });
 
   // Sortable
@@ -1080,31 +1188,6 @@ function renderGrid() {
   });
 
   updateSelCount();
-}
-
-async function renderThumb(pg) {
-  // If already cached, just populate the card DOM
-  if (thumbCache.has(pg.id)) {
-    const c = document.getElementById('thumb-' + pg.id);
-    if (c) { c.innerHTML = ''; c.appendChild(copyCanvas(thumbCache.get(pg.id))); }
-    return;
-  }
-  try {
-    const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
-    const viewport = page.getViewport({ scale: 0.4 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    thumbCache.set(pg.id, canvas);
-    // Update card thumbnail
-    const c = document.getElementById('thumb-' + pg.id);
-    if (c) { c.innerHTML = ''; c.appendChild(copyCanvas(canvas)); }
-    // If this page is the active preview but full isn't cached → kick off full render now
-    if (previewingId === pg.id && !fullCache.has(pg.id) && renderingId !== pg.id) {
-      setPreview(pg.id);
-    }
-  } catch(e) {}
 }
 
 function shortName(name) {
@@ -1141,18 +1224,7 @@ function toggleSelect(id) {
     });
   }
   updateSelCount();
-  // preview on select — show spinner immediately if nothing cached yet
-  if (!thumbCache.has(id) && !fullCache.has(id)) {
-    // Show loading state immediately — renderThumb will upgrade it
-    previewingId = id;
-    document.querySelectorAll('.page-card').forEach(c => c.classList.remove('previewing'));
-    const card2 = document.querySelector(`.page-card[data-id="${id}"]`);
-    if (card2) card2.classList.add('previewing');
-    document.getElementById('previewInfo').textContent = `${t('page')} ${pg.pageIndex + 1} ${t('of')} ${pg.pdfDoc.numPages}`;
-    document.getElementById('previewBody').innerHTML = `<div class="preview-loading"><div class="spinner"></div><span>${t('toastLoading')}</span></div>`;
-  } else {
-    setPreview(id);
-  }
+  setPreview(id);
 }
 
 function selectAll() {
@@ -1199,7 +1271,7 @@ function updateSelCount() {
   document.getElementById('btnMergeSel').disabled = selCount === 0;
 }
 
-// ── Canvas copy helper (cloneNode doesn't copy pixel data) ───────────────────
+// ── Canvas copy helper ────────────────────────────────────────────────────────
 function copyCanvas(src) {
   const dst = document.createElement('canvas');
   dst.width = src.width;
@@ -1209,32 +1281,13 @@ function copyCanvas(src) {
 }
 
 // ── Preview ───────────────────────────────────────────────────────────────────
-let renderingId = null; // tracks which page is currently being full-rendered
-
-function showThumbInPreview(pg) {
-  const body = document.getElementById('previewBody');
-  const thumbCanvas = thumbCache.get(pg.id);
-  if (!thumbCanvas) return;
-  body.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'preview-canvas-wrap';
-  wrap.style.position = 'relative';
-  wrap.appendChild(copyCanvas(thumbCanvas));
-  const spinWrap = document.createElement('div');
-  spinWrap.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.35);';
-  spinWrap.innerHTML = '<div class="spinner"></div>';
-  wrap.appendChild(spinWrap);
-  body.appendChild(wrap);
-}
+let renderingId = null;
 
 async function setPreview(id) {
   const pg = pages.find(p => p.id === id);
   if (!pg) return;
+  if (previewingId === id && fullCache.has(id)) return; // already showing full
 
-  // State 1: nothing cached yet → show nothing
-  if (!thumbCache.has(pg.id) && !fullCache.has(pg.id)) return;
-
-  // Update active card border
   previewingId = id;
   document.querySelectorAll('.page-card').forEach(c => c.classList.remove('previewing'));
   const card = document.querySelector(`.page-card[data-id="${id}"]`);
@@ -1243,41 +1296,40 @@ async function setPreview(id) {
 
   const body = document.getElementById('previewBody');
 
-  // State 3: full already cached → show instantly, done
-  if (fullCache.has(pg.id)) {
+  // Full already cached → instant
+  if (fullCache.has(id)) {
     body.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'preview-canvas-wrap';
-    wrap.appendChild(copyCanvas(fullCache.get(pg.id)));
+    wrap.appendChild(copyCanvas(fullCache.get(id)));
     body.appendChild(wrap);
     appendPreviewMeta(body, pg);
     return;
   }
 
-  // State 2: thumb ready, full not cached yet
-  // If already rendering this page, just show thumb+spinner and wait
-  showThumbInPreview(pg);
-  if (renderingId === id) return; // already in progress, thumb shown, will upgrade when done
+  // Show spinner while rendering
+  body.innerHTML = `<div class="preview-loading"><div class="spinner"></div></div>`;
 
-  // Start full render
+  // If already rendering this page, just wait — it will update on completion
+  if (renderingId === id) return;
   renderingId = id;
+
   try {
     const page = await pg.pdfDoc.getPage(pg.pageIndex + 1);
     const panelEl = document.getElementById('previewPanel');
     const panelW = Math.min((panelEl ? panelEl.offsetWidth - 28 : 600), 800);
     const safeW = panelW > 50 ? panelW : 600;
-    const baseVP = page.getViewport({ scale: 1 });
+    const rotation = page.rotate || 0;
+    const baseVP = page.getViewport({ scale: 1, rotation });
     const scale = safeW / baseVP.width;
-    const viewport = page.getViewport({ scale });
+    const viewport = page.getViewport({ scale, rotation });
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-
-    fullCache.set(pg.id, canvas);
+    fullCache.set(id, canvas);
     renderingId = null;
 
-    // Only update display if this page is still the active preview
     if (previewingId !== id) return;
     body.innerHTML = '';
     const wrap = document.createElement('div');
@@ -1287,9 +1339,8 @@ async function setPreview(id) {
     appendPreviewMeta(body, pg);
   } catch(e) {
     renderingId = null;
-    if (previewingId === id) {
-      body.innerHTML = `<div style="color:var(--danger);font-size:0.75rem">Error loading preview</div>`;
-    }
+    if (previewingId === id)
+      body.innerHTML = `<div style="color:var(--danger);font-size:0.75rem;padding:16px">Error rendering page</div>`;
   }
 }
 

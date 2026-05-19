@@ -16,3 +16,8 @@ todos:
 after webassembly update: 
   - initial loading: Doesn't count if there are multiple pdfs, only show 9/9 or 2/2, etc....
   - Scrollable preview use style="overflow:auto" to the div or canvas
+
+
+
+
+Fix: rearragning animation.

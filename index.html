@@ -164,7 +164,22 @@
   .btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn:disabled:hover { background: var(--surface3); border-color: var(--border); transform: none; }
 
-  .sel-count {
+  .btn.icon-btn {
+    padding: 5px 9px;
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .btn.icon-btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+  /* Card flash animation for undo/redo feedback */
+  @keyframes cardFlash {
+    0%   { box-shadow: 0 0 0 0 rgba(232,255,71,0); border-color: var(--border); }
+    30%  { box-shadow: 0 0 0 4px rgba(232,255,71,0.5); border-color: var(--accent); }
+    100% { box-shadow: 0 0 0 0 rgba(232,255,71,0); border-color: var(--border); }
+  }
+  .page-card.flash-undo {
+    animation: cardFlash 350ms ease-out forwards;
+  }
     font-family: 'DM Mono', monospace;
     font-size: 0.72rem;
     color: var(--text-muted);
@@ -225,9 +240,10 @@
   /* Page Grid */
   .page-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(max(160px, calc((100% - 100px) / 6)), 1fr));
+    gap: 20px;
     padding-bottom: 20px;
+    position: relative;
   }
 
   .page-card {
@@ -237,8 +253,9 @@
     border-radius: var(--radius);
     overflow: visible;
     cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
     user-select: none;
+    will-change: transform;
   }
   .page-card:hover {
     border-color: #444;
@@ -254,10 +271,22 @@
     box-shadow: 0 0 0 1px var(--accent2);
   }
   .page-card.sortable-ghost {
-    opacity: 0.3;
+    opacity: 0;
+    border: 2px dashed var(--accent);
+    background: rgba(232,255,71,0.06);
+    border-radius: var(--radius);
   }
   .page-card.sortable-chosen {
     cursor: grabbing;
+    opacity: 0.45;
+    transform: scale(0.96) rotate(1deg);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    z-index: 99;
+  }
+  .page-card.sortable-drag {
+    opacity: 0.45;
+    transform: scale(0.96) rotate(1deg);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.7);
   }
 
   .card-thumb {
@@ -299,12 +328,12 @@
     flex: 1;
   }
   .card-split-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
+    background: rgba(71,200,255,0.07);
+    border: 1px solid rgba(71,200,255,0.3);
+    color: var(--accent2);
     font-size: 0.6rem;
     font-family: 'DM Mono', monospace;
-    padding: 2px 5px;
+    padding: 2px 6px;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s;
@@ -312,9 +341,11 @@
     flex-shrink: 0;
   }
   .card-split-btn:hover {
+    background: rgba(71,200,255,0.28);
     border-color: var(--accent2);
-    color: var(--accent2);
-    background: rgba(71,200,255,0.08);
+    color: #fff;
+    box-shadow: 0 0 6px rgba(71,200,255,0.3);
+    transform: scale(1.08);
   }
 
   /* Delete button */
@@ -397,7 +428,15 @@
   }
   .resizer:hover, .resizer.dragging { background: var(--accent); }
 
-  /* ── SPINNER ─────────────────────────────────── */
+  /* ── RUBBER BAND SELECTION ───────────────────── */
+  .rubber-band {
+    position: absolute;
+    border: 1.5px solid var(--accent);
+    background: rgba(232,255,71,0.08);
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 10;
+  }
   .spinner {
     width: 28px; height: 28px;
     border: 3px solid var(--surface3);
@@ -469,7 +508,7 @@
 
   /* ── PREVIEW PANEL ───────────────────────────── */
   .preview-panel {
-    width: 35%;
+    width: 50%;
     min-width: 200px;
     max-width: 70vw;
     background: var(--surface);
@@ -504,10 +543,10 @@
 
   .preview-body {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: stretch;
     justify-content: flex-start;
     padding: 14px;
     gap: 10px;
@@ -527,15 +566,14 @@
   .preview-empty p { font-size: 0.75rem; line-height: 1.5; }
 
   .preview-canvas-wrap {
-    width: 100%;
+    flex: 1;
+    overflow: auto;
     background: #fff;
     border-radius: var(--radius-sm);
-    overflow: hidden;
     box-shadow: var(--shadow);
+    min-height: 0;
   }
   .preview-canvas-wrap canvas {
-    width: 100% !important;
-    height: auto !important;
     display: block;
   }
 
@@ -574,7 +612,7 @@
     border-radius: 14px;
     width: 100%;
     max-width: 900px;
-    height: 90vh;
+    height: 96vh;
     display: flex;
     flex-direction: column;
     box-shadow: 0 24px 80px rgba(0,0,0,0.7);
@@ -586,7 +624,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
+    padding: 8px 16px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
@@ -606,7 +644,69 @@
   }
   .modal-close:hover { color: var(--text); }
 
-  /* ── MODAL VIEWER (scrollable page stack) ── */
+  /* ── MODAL ZOOM TOOLBAR ──────────────────────── */
+  .modal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    flex-shrink: 0;
+    gap: 8px;
+  }
+  .modal-toolbar .zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .modal-toolbar .zoom-btn {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.85rem;
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .modal-toolbar .zoom-btn:hover { background: var(--surface); }
+  .modal-toolbar .zoom-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    min-width: 44px;
+    text-align: center;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: border-color 0.15s;
+  }
+  .modal-toolbar .zoom-pct:hover { border-color: var(--border); }
+  .modal-toolbar .page-indicator {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .modal-toolbar .page-indicator span { color: var(--text); }
+
+  /* ── MODAL VIEWER ZOOM WRAP ──────────────────── */
+  .modal-viewer-zoom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px;
+    gap: 20px;
+    transform-origin: top center;
+    transition: transform 0.15s ease;
+  }
   .modal-viewer {
     flex: 1;
     overflow-y: auto;
@@ -659,12 +759,6 @@
   }
 
   /* ── FILMSTRIP ── */
-  .modal-filmstrip-wrap {
-    flex-shrink: 0;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    padding: 10px 14px;
-  }
   .modal-filmstrip {
     display: flex;
     gap: 8px;
@@ -732,10 +826,47 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
+    padding: 8px 16px;
     border-top: 1px solid var(--border);
     flex-shrink: 0;
     gap: 10px;
+  }
+
+  /* Filmstrip collapse toggle */
+  .modal-filmstrip-wrap {
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    transition: padding 0.2s, max-height 0.25s ease;
+    max-height: 200px;
+    overflow: hidden;
+  }
+  .modal-filmstrip-wrap.collapsed {
+    max-height: 28px;
+    padding-bottom: 0;
+  }
+  .filmstrip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .filmstrip-header span {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .filmstrip-toggle {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    transition: transform 0.2s;
+  }
+  .modal-filmstrip-wrap.collapsed .filmstrip-toggle {
+    transform: rotate(180deg);
   }
   .modal-footer .page-count {
     font-family: 'DM Mono', monospace;
@@ -842,7 +973,11 @@
 
 <!-- Action bar -->
 <div class="action-bar" id="actionBar" style="display:none">
+  <button class="btn icon-btn" id="btnUndo" onclick="undo()" title="Undo (Ctrl+Z)" disabled>↩</button>
+  <button class="btn icon-btn" id="btnRedo" onclick="redo()" title="Redo (Ctrl+Y)" disabled>↪</button>
+  <div class="sep"></div>
   <button class="btn" onclick="selectAll()" data-i18n="selectAll">Select All</button>
+  <button class="btn" onclick="unselectAll()" data-i18n="unselectAll">Unselect All</button>
   <button class="btn" onclick="inverseSelect()" data-i18n="inverseSelect">Inverse Select</button>
   <div class="sep"></div>
   <button class="btn primary" onclick="mergeAll()" data-i18n="mergeAll">Merge All</button>
@@ -899,10 +1034,27 @@
       <h2 id="modalTitle">Merge Preview</h2>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
+    <!-- Zoom toolbar -->
+    <div class="modal-toolbar">
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="modalZoom(-1)" title="Zoom out">−</button>
+        <span class="zoom-pct" id="modalZoomPct" onclick="modalZoomReset()" title="Click to reset to 100%">100%</span>
+        <button class="zoom-btn" onclick="modalZoom(+1)" title="Zoom in">+</button>
+      </div>
+      <div class="page-indicator">
+        <span id="modalCurPage">1</span> / <span id="modalTotalPages">1</span>
+      </div>
+    </div>
     <!-- Scrollable full-page viewer -->
-    <div class="modal-viewer" id="modalViewer"></div>
+    <div class="modal-viewer" id="modalViewer">
+      <div class="modal-viewer-zoom" id="modalViewerZoom"></div>
+    </div>
     <!-- Filmstrip -->
-    <div class="modal-filmstrip-wrap">
+    <div class="modal-filmstrip-wrap" id="modalFilmstripWrap">
+      <div class="filmstrip-header" onclick="toggleFilmstrip()">
+        <span>Pages</span>
+        <span class="filmstrip-toggle">▲</span>
+      </div>
       <div class="modal-filmstrip" id="modalFilmstrip"></div>
     </div>
     <div class="modal-footer">
@@ -969,6 +1121,7 @@ const STRINGS = {
   en: {
     addFiles: 'Add Files',
     selectAll: 'Select All',
+    unselectAll: 'Unselect All',
     inverseSelect: 'Inverse Select',
     mergeAll: 'Merge All',
     mergeSelected: 'Merge Selected',
@@ -992,10 +1145,13 @@ const STRINGS = {
     filenamePrompt: 'Save as:',
     loading: 'Loading PDF…',
     loadingPage: 'Rendering page',
+    merging: 'Exporting…',
+    mergingModal: 'Merging…',
   },
   vi: {
     addFiles: 'Thêm File',
     selectAll: 'Chọn Tất Cả',
+    unselectAll: 'Bỏ Chọn Tất Cả',
     inverseSelect: 'Chọn Còn Lại',
     mergeAll: 'Nối Tất Cả',
     mergeSelected: 'Nối Trang Đã Chọn',
@@ -1019,6 +1175,8 @@ const STRINGS = {
     filenamePrompt: 'Lưu với tên:',
     loading: 'Đang tải PDF…',
     loadingPage: 'Đang render trang',
+    merging: 'Đang xuất file…',
+    mergingModal: 'Đang nối files…',
   }
 };
 
@@ -1051,6 +1209,76 @@ let modalPages = [];
 // ── Caches ────────────────────────────────────────────────────────────────────
 const thumbCache = new Map();   // id → canvas (low-res, rendered by MuPDF)
 const fullCache  = new Map();   // id → canvas (full-res, rendered by MuPDF)
+
+// ── History (undo/redo) ───────────────────────────────────────────────────────
+const MAX_HISTORY = 50;
+let undoStack = []; // each entry: { pages: snapshot, selectedOrder: snapshot }
+let redoStack = [];
+
+function snapshotState() {
+  return {
+    pages: pages.map(p => ({ ...p })),
+    selectedOrder: [...selectedOrder],
+  };
+}
+
+function pushHistory() {
+  undoStack.push(snapshotState());
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  redoStack = []; // clear redo on new action
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  const u = document.getElementById('btnUndo');
+  const r = document.getElementById('btnRedo');
+  if (u) u.disabled = undoStack.length === 0;
+  if (r) r.disabled = redoStack.length === 0;
+}
+
+function flashChangedCards(prevIds, nextIds) {
+  // Find cards that changed (added, removed, reordered, selection changed)
+  const prevMap = new Map(prevIds.map((id, i) => [id, i]));
+  const nextMap = new Map(nextIds.map((id, i) => [id, i]));
+  const changed = new Set();
+  nextIds.forEach((id, i) => {
+    if (!prevMap.has(id) || prevMap.get(id) !== i) changed.add(id);
+  });
+  prevIds.forEach(id => { if (!nextMap.has(id)) changed.add(id); });
+  // Also flash cards whose selection changed
+  changed.forEach(id => {
+    const card = document.querySelector(`.page-card[data-id="${id}"]`);
+    if (!card) return;
+    card.classList.remove('flash-undo');
+    void card.offsetWidth; // reflow to restart animation
+    card.classList.add('flash-undo');
+    setTimeout(() => card.classList.remove('flash-undo'), 360);
+  });
+}
+
+function restoreState(snapshot) {
+  const prevIds = pages.map(p => p.id);
+  pages = snapshot.pages.map(p => ({ ...p }));
+  selectedOrder = [...snapshot.selectedOrder];
+  renderGrid();
+  flashChangedCards(prevIds, pages.map(p => p.id));
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(snapshotState());
+  const prev = undoStack.pop();
+  restoreState(prev);
+  updateUndoButtons();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(snapshotState());
+  const next = redoStack.pop();
+  restoreState(next);
+  updateUndoButtons();
+}
 
 // Apply saved lang (must be after pages declaration)
 setLang(lang);
@@ -1194,6 +1422,27 @@ async function loadFiles(files) {
   renderGrid();
   await new Promise(r => setTimeout(r, 300));
   hideLoadingOverlay();
+
+  // Background: cache full pages silently, no UI blocking
+  cacheFullPagesInBackground(newPages);
+}
+
+// Renders full pages into fullCache sequentially in the background.
+// Uses setTimeout to yield to the UI between each page so the app stays responsive.
+async function cacheFullPagesInBackground(pagesToCache) {
+  for (const pg of pagesToCache) {
+    if (fullCache.has(pg.id)) continue;
+    await new Promise(resolve => setTimeout(resolve, 0)); // yield to UI thread
+    try {
+      const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+      const bounds = page.getBounds();
+      page.destroy();
+      const naturalW = bounds[2] - bounds[0];
+      const scale = 760 / naturalW;
+      const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+      fullCache.set(pg.id, canvas);
+    } catch(e) {}
+  }
 }
 
 async function renderThumbForPage(pg) {
@@ -1239,7 +1488,7 @@ function renderGrid() {
       <div class="card-thumb" id="thumb-${pg.id}"></div>
       <div class="card-footer">
         <span class="card-label" title="${pg.fileName} p.${pg.pageIndex+1}">p.${pg.pageIndex+1} · ${shortName(pg.fileName)}</span>
-        <button class="card-split-btn" title="${t('split')}" onclick="splitPage(event,'${pg.id}')">${t('split')}</button>
+        <button class="card-split-btn" data-i18n="split" onclick="splitPage(event,'${pg.id}')">${t('split')}</button>
       </div>
       <button class="card-delete" title="Delete" onclick="deletePage(event,'${pg.id}')">✕</button>
     `;
@@ -1270,10 +1519,13 @@ function renderGrid() {
   // Sortable
   if (window._sortable) window._sortable.destroy();
   window._sortable = Sortable.create(grid, {
-    animation: 150,
+    animation: 350,
+    easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
     onEnd(evt) {
+      pushHistory();
       const moved = pages.splice(evt.oldIndex, 1)[0];
       pages.splice(evt.newIndex, 0, moved);
       updateSelCount();
@@ -1291,6 +1543,7 @@ function shortName(name) {
 function toggleSelect(id) {
   const pg = pages.find(p => p.id === id);
   if (!pg) return;
+  pushHistory();
   if (pg.selected) {
     pg.selected = false;
     pg.orderNum = 0;
@@ -1321,6 +1574,7 @@ function toggleSelect(id) {
 }
 
 function selectAll() {
+  pushHistory();
   selectedOrder = [];
   pages.forEach(pg => {
     pg.selected = true;
@@ -1331,7 +1585,16 @@ function selectAll() {
   updateSelCount();
 }
 
+function unselectAll() {
+  pushHistory();
+  pages.forEach(pg => { pg.selected = false; pg.orderNum = 0; });
+  selectedOrder = [];
+  refreshCardStates();
+  updateSelCount();
+}
+
 function inverseSelect() {
+  pushHistory();
   selectedOrder = [];
   pages.forEach(pg => {
     pg.selected = !pg.selected;
@@ -1443,6 +1706,7 @@ function appendPreviewMeta(body, pg) {
 // ── Delete / Split ────────────────────────────────────────────────────────────
 function deletePage(e, id) {
   e.stopPropagation();
+  pushHistory();
   pages = pages.filter(p => p.id !== id);
   selectedOrder = selectedOrder.filter(x => x !== id);
   if (previewingId === id) {
@@ -1457,18 +1721,15 @@ async function splitPage(e, id) {
   e.stopPropagation();
   const pg = pages.find(p => p.id === id);
   if (!pg) return;
-  const defaultName = `page-${pg.pageIndex + 1}-${pg.fileName}`;
-  const filename = prompt(t('filenamePrompt'), defaultName);
-  if (filename === null) return;
-  const finalName = (filename.trim() || defaultName).replace(/\.pdf$/i,'') + '.pdf';
+  const defaultName = `page-${pg.pageIndex + 1}-${pg.fileName}`.replace(/\.pdf$/i, '') + '.pdf';
   try {
     const srcDoc = await PDFLib.PDFDocument.load(pg.pdfBytes);
     const newDoc = await PDFLib.PDFDocument.create();
     const [copied] = await newDoc.copyPages(srcDoc, [pg.pageIndex]);
     newDoc.addPage(copied);
     const outBytes = await newDoc.save();
-    downloadPDF(outBytes, finalName);
-    showToast(t('toastExported'), 'success');
+    const saved = await downloadPDF(outBytes, defaultName);
+    if (saved) showToast(t('toastExported'), 'success');
   } catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
@@ -1489,10 +1750,50 @@ function mergeSelected() {
 let filmSortable = null;
 let activeModalIdx = 0;
 
-function openModal(pagesArr, title) {
+async function openModal(pagesArr, title) {
   modalPages = pagesArr.map(p => ({ ...p }));
   document.getElementById('modalTitle').textContent = title;
   activeModalIdx = 0;
+
+  const uncachedThumbs = modalPages.filter(pg => !thumbCache.has(pg.id));
+  const uncachedFull   = modalPages.filter(pg => !fullCache.has(pg.id));
+  const hasWork = uncachedThumbs.length > 0 || uncachedFull.length > 0;
+
+  if (hasWork) {
+    showLoadingOverlay(t('mergingModal'));
+    await new Promise(r => setTimeout(r, 30));
+
+    const total = modalPages.length;
+
+    for (let i = 0; i < uncachedThumbs.length; i++) {
+      setLoadingProgress(
+        Math.round((i / total) * 50),
+        `${t('mergingModal')} ${i + 1} / ${total}`
+      );
+      await renderThumbForPage(uncachedThumbs[i]);
+    }
+
+    for (let i = 0; i < uncachedFull.length; i++) {
+      setLoadingProgress(
+        50 + Math.round((i / total) * 49),
+        `${t('mergingModal')} ${i + 1} / ${total}`
+      );
+      const pg = uncachedFull[i];
+      try {
+        const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+        const bounds = page.getBounds();
+        page.destroy();
+        const naturalW = bounds[2] - bounds[0];
+        const scale = 760 / naturalW;
+        const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+        fullCache.set(pg.id, canvas);
+      } catch(e) {}
+    }
+
+    hideLoadingOverlay();
+  }
+
+  modalZoomLevel = 1.0;
   renderModalFull();
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -1510,8 +1811,8 @@ function renderModalFull() {
 }
 
 function renderModalViewer() {
-  const viewer = document.getElementById('modalViewer');
-  viewer.innerHTML = '';
+  const zoomWrap = document.getElementById('modalViewerZoom');
+  zoomWrap.innerHTML = '';
 
   modalPages.forEach((pg, idx) => {
     const block = document.createElement('div');
@@ -1519,7 +1820,6 @@ function renderModalViewer() {
     block.dataset.idx = idx;
     block.id = `mpb-${idx}`;
 
-    // Loading placeholder
     const loadDiv = document.createElement('div');
     loadDiv.className = 'mpb-loading';
     loadDiv.innerHTML = '<div class="spinner"></div>';
@@ -1530,15 +1830,18 @@ function renderModalViewer() {
     label.textContent = `${idx + 1} · ${shortName(pg.fileName)} p.${pg.pageIndex + 1}`;
     block.appendChild(label);
 
-    // Hover → highlight filmstrip
     block.addEventListener('mouseenter', () => setActiveModalIdx(idx, false));
 
-    viewer.appendChild(block);
+    zoomWrap.appendChild(block);
     renderModalPageFull(pg, idx);
   });
 
-  // Scroll listener → update active on scroll
+  const viewer = document.getElementById('modalViewer');
   viewer.addEventListener('scroll', onModalViewerScroll);
+
+  // Update page indicator total
+  document.getElementById('modalTotalPages').textContent = modalPages.length;
+  document.getElementById('modalCurPage').textContent = Math.min(1, modalPages.length);
 }
 
 function onModalViewerScroll() {
@@ -1558,40 +1861,44 @@ function onModalViewerScroll() {
 
 function setActiveModalIdx(idx, scrollViewer = true) {
   activeModalIdx = idx;
-  // Highlight viewer block
   document.querySelectorAll('.modal-page-block').forEach((b, i) => {
     b.classList.toggle('active', i === idx);
   });
-  // Highlight filmstrip thumb
   document.querySelectorAll('.film-thumb').forEach((t, i) => {
     t.classList.toggle('active', i === idx);
   });
-  // Scroll filmstrip to show active thumb
   const strip = document.getElementById('modalFilmstrip');
   const thumb = strip.querySelector(`.film-thumb[data-idx="${idx}"]`);
   if (thumb) thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  // Optionally scroll viewer
   if (scrollViewer) {
     const block = document.getElementById(`mpb-${idx}`);
     if (block) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  // Update page indicator
+  document.getElementById('modalCurPage').textContent = idx + 1;
 }
 
 async function renderModalPageFull(pg, idx) {
   const block = document.getElementById(`mpb-${idx}`);
   if (!block) return;
   try {
-    const viewer = document.getElementById('modalViewer');
-    const maxW = Math.min((viewer ? viewer.offsetWidth - 48 : 720), 760);
-    const safeW = maxW > 0 ? maxW : 720;
-
-    const page = pg.mupdfDoc.loadPage(pg.pageIndex);
-    const bounds = page.getBounds();
-    page.destroy();
-    const naturalW = bounds[2] - bounds[0];
-    const scale = safeW / naturalW;
-
-    const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+    let canvas;
+    // Reuse fullCache if available — no re-render needed
+    if (fullCache.has(pg.id)) {
+      canvas = copyCanvas(fullCache.get(pg.id));
+    } else {
+      const viewer = document.getElementById('modalViewer');
+      const maxW = Math.min((viewer ? viewer.offsetWidth - 48 : 720), 760);
+      const safeW = maxW > 0 ? maxW : 720;
+      const page = pg.mupdfDoc.loadPage(pg.pageIndex);
+      const bounds = page.getBounds();
+      page.destroy();
+      const naturalW = bounds[2] - bounds[0];
+      const scale = safeW / naturalW;
+      canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+      fullCache.set(pg.id, canvas);
+      canvas = copyCanvas(canvas);
+    }
     if (!block.isConnected) return;
     block.querySelector('.mpb-loading')?.remove();
     const label = block.querySelector('.mpb-label');
@@ -1608,14 +1915,36 @@ function renderModalFilmstrip() {
     const thumb = document.createElement('div');
     thumb.className = 'film-thumb' + (idx === activeModalIdx ? ' active' : '');
     thumb.dataset.idx = idx;
-    thumb.innerHTML = `
-      <div class="ft-img" id="fthumb-${idx}"><div class="spinner" style="width:16px;height:16px;border-width:2px"></div></div>
-      <div class="ft-num">${idx + 1}</div>
-      <button class="ft-del" onclick="modalFilmDelete(event,${idx})">✕</button>
-    `;
+
+    const ftImg = document.createElement('div');
+    ftImg.className = 'ft-img';
+    ftImg.id = `fthumb-${idx}`;
+
+    // Paint synchronously from cache — avoids innerHTML overwrite bug
+    if (thumbCache.has(pg.id)) {
+      ftImg.appendChild(copyCanvas(thumbCache.get(pg.id)));
+    } else {
+      const spinner = document.createElement('div');
+      spinner.className = 'spinner';
+      spinner.style.cssText = 'width:16px;height:16px;border-width:2px';
+      ftImg.appendChild(spinner);
+      renderFilmThumb(pg, idx); // async fallback
+    }
+
+    const numDiv = document.createElement('div');
+    numDiv.className = 'ft-num';
+    numDiv.textContent = idx + 1;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'ft-del';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', e => modalFilmDelete(e, idx));
+
+    thumb.appendChild(ftImg);
+    thumb.appendChild(numDiv);
+    thumb.appendChild(delBtn);
     thumb.addEventListener('click', () => setActiveModalIdx(idx, true));
     strip.appendChild(thumb);
-    renderFilmThumb(pg, idx);
   });
 
   if (filmSortable) filmSortable.destroy();
@@ -1625,7 +1954,6 @@ function renderModalFilmstrip() {
     onEnd(evt) {
       const moved = modalPages.splice(evt.oldIndex, 1)[0];
       modalPages.splice(evt.newIndex, 0, moved);
-      // Rerender both after reorder
       activeModalIdx = evt.newIndex;
       renderModalFull();
     }
@@ -1654,6 +1982,50 @@ async function renderFilmThumb(pg, idx) {
   } catch(e) {}
 }
 
+// ── Modal zoom ────────────────────────────────────────────────────────────────
+let modalZoomLevel = 1.0;
+const ZOOM_STEPS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0];
+
+function applyModalZoom() {
+  const zoomWrap = document.getElementById('modalViewerZoom');
+  if (!zoomWrap) return;
+  zoomWrap.style.transform = `scale(${modalZoomLevel})`;
+  // Adjust wrap height so scrollable area reflects scaled size
+  zoomWrap.style.transformOrigin = 'top center';
+  // Expand the scroll container to accommodate scaled content
+  const naturalH = zoomWrap.scrollHeight / modalZoomLevel;
+  zoomWrap.style.marginBottom = `${(modalZoomLevel - 1) * naturalH}px`;
+  document.getElementById('modalZoomPct').textContent = Math.round(modalZoomLevel * 100) + '%';
+}
+
+function modalZoom(dir) {
+  const cur = ZOOM_STEPS.indexOf(
+    ZOOM_STEPS.reduce((prev, curr) =>
+      Math.abs(curr - modalZoomLevel) < Math.abs(prev - modalZoomLevel) ? curr : prev
+    )
+  );
+  const next = Math.max(0, Math.min(ZOOM_STEPS.length - 1, cur + dir));
+  modalZoomLevel = ZOOM_STEPS[next];
+  applyModalZoom();
+}
+
+function modalZoomReset() {
+  modalZoomLevel = 1.0;
+  applyModalZoom();
+}
+
+// Ctrl + scroll wheel to zoom
+document.getElementById('modalViewer').addEventListener('wheel', e => {
+  if (!e.ctrlKey) return;
+  e.preventDefault();
+  modalZoom(e.deltaY < 0 ? +1 : -1);
+}, { passive: false });
+
+function toggleFilmstrip() {
+  const wrap = document.getElementById('modalFilmstripWrap');
+  wrap.classList.toggle('collapsed');
+}
+
 function modalFilmDelete(e, idx) {
   e.stopPropagation();
   modalPages.splice(idx, 1);
@@ -1664,30 +2036,91 @@ function modalFilmDelete(e, idx) {
 async function exportMerged() {
   if (modalPages.length === 0) { showToast(t('toastNoPages')); return; }
   const defaultName = 'merged.pdf';
-  const filename = prompt(t('filenamePrompt'), defaultName);
-  if (filename === null) return;
-  const finalName = (filename.trim() || defaultName).replace(/\.pdf$/i,'') + '.pdf';
+
+  // Get file handle FIRST while user gesture is still fresh,
+  // before any async PDF building that would expire the gesture token.
+  let fileHandle = null;
+  if ('showSaveFilePicker' in window) {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: defaultName,
+        types: [{ description: 'PDF File', accept: { 'application/pdf': ['.pdf'] } }],
+      });
+    } catch(err) {
+      if (err.name === 'AbortError') return; // user cancelled
+      // Fall through to prompt fallback
+    }
+  }
+
+  // Now build the PDF (can take as long as needed)
+  showLoadingOverlay(t('merging'));
   try {
     const newDoc = await PDFLib.PDFDocument.create();
-    for (const pg of modalPages) {
+    for (let i = 0; i < modalPages.length; i++) {
+      const pg = modalPages[i];
+      setLoadingProgress(
+        Math.round((i / modalPages.length) * 90),
+        `${t('merging')} ${i + 1} / ${modalPages.length}`
+      );
       const srcDoc = await PDFLib.PDFDocument.load(pg.pdfBytes);
       const [copied] = await newDoc.copyPages(srcDoc, [pg.pageIndex]);
       newDoc.addPage(copied);
     }
+    setLoadingProgress(95, t('merging'));
     const outBytes = await newDoc.save();
-    downloadPDF(outBytes, finalName);
-    showToast(t('toastExported'), 'success');
-    closeModal();
-  } catch(e) { showToast('Error: ' + e.message, 'error'); }
+    setLoadingProgress(100, '✓');
+    hideLoadingOverlay();
+
+    // Write to the handle we got earlier, or fall back
+    let saved = false;
+    if (fileHandle) {
+      try {
+        const writable = await fileHandle.createWritable();
+        await writable.write(new Blob([outBytes], { type: 'application/pdf' }));
+        await writable.close();
+        saved = true;
+      } catch(e) {
+        saved = await downloadPDF(outBytes, defaultName); // fallback
+      }
+    } else {
+      saved = await downloadPDF(outBytes, defaultName);
+    }
+
+    if (saved) { showToast(t('toastExported'), 'success'); closeModal(); }
+  } catch(e) {
+    hideLoadingOverlay();
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
-function downloadPDF(bytes, name) {
+async function downloadPDF(bytes, suggestedName) {
   const blob = new Blob([bytes], { type: 'application/pdf' });
+
+  if ('showSaveFilePicker' in window) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: 'PDF File', accept: { 'application/pdf': ['.pdf'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return true;
+    } catch (err) {
+      if (err.name === 'AbortError') return false; // user cancelled
+    }
+  }
+
+  const defaultName = suggestedName || 'export.pdf';
+  const filename = prompt(t('filenamePrompt'), defaultName);
+  if (filename === null) return false; // user cancelled
+  const finalName = (filename.trim() || defaultName).replace(/\.pdf$/i, '') + '.pdf';
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
+  a.href = url; a.download = finalName; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }
 
 function showToast(msg, type = '') {
@@ -1718,7 +2151,10 @@ function showToast(msg, type = '') {
   document.addEventListener('mousemove', e => {
     if (!dragging) return;
     const delta = startX - e.clientX;
-    const newW = Math.max(160, Math.min(startW + delta, workspace.offsetWidth * 0.6));
+    const workspaceW = workspace.offsetWidth;
+    const minPanelW = 160;
+    const maxPanelW = workspaceW - 480; // keep at least 480px for organizer (≈3 cards)
+    const newW = Math.max(minPanelW, Math.min(startW + delta, maxPanelW));
     panel.style.width = newW + 'px';
   });
 
@@ -1741,11 +2177,104 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 });
 
+// ── Rubber-band drag selection ────────────────────────────────────────────────
+(function() {
+  const grid = document.getElementById('pageGrid');
+  let band = null, startX = 0, startY = 0, scrollTopStart = 0;
+  const organizer = document.getElementById('organizer');
+
+  organizer.addEventListener('mousedown', e => {
+    // Only start on empty grid background, left button only
+    if (e.button !== 0) return;
+    if (e.target.closest('.page-card')) return;
+    if (!document.getElementById('pageGrid') || pages.length === 0) return;
+
+    pushHistory(); // snapshot before rubber-band selection starts
+
+    const gridRect = grid.getBoundingClientRect();
+    startX = e.clientX - gridRect.left + grid.parentElement.scrollLeft;
+    startY = e.clientY - gridRect.top + grid.parentElement.scrollTop;
+    scrollTopStart = grid.parentElement.scrollTop;
+
+    band = document.createElement('div');
+    band.className = 'rubber-band';
+    band.style.left = (startX) + 'px';
+    band.style.top = (startY) + 'px';
+    band.style.width = '0px';
+    band.style.height = '0px';
+    grid.appendChild(band);
+
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!band) return;
+    const gridRect = grid.getBoundingClientRect();
+    const scrollEl = grid.parentElement;
+    const curX = e.clientX - gridRect.left + scrollEl.scrollLeft;
+    const curY = e.clientY - gridRect.top + scrollEl.scrollTop;
+
+    const x = Math.min(startX, curX);
+    const y = Math.min(startY, curY);
+    const w = Math.abs(curX - startX);
+    const h = Math.abs(curY - startY);
+
+    band.style.left = x + 'px';
+    band.style.top = y + 'px';
+    band.style.width = w + 'px';
+    band.style.height = h + 'px';
+
+    // Hit test each card against the band rect
+    const bandRect = { left: x, top: y, right: x + w, bottom: y + h };
+    document.querySelectorAll('.page-card').forEach(card => {
+      const cr = card.getBoundingClientRect();
+      const gl = gridRect;
+      const scrollEl = grid.parentElement;
+      // card position relative to grid (accounting for scroll)
+      const cardLeft   = cr.left - gl.left + scrollEl.scrollLeft;
+      const cardTop    = cr.top  - gl.top  + scrollEl.scrollTop;
+      const cardRight  = cardLeft + cr.width;
+      const cardBottom = cardTop  + cr.height;
+
+      const overlaps = !(cardRight  < bandRect.left  ||
+                         cardLeft   > bandRect.right ||
+                         cardBottom < bandRect.top   ||
+                         cardTop    > bandRect.bottom);
+
+      if (overlaps) {
+        const id = card.dataset.id;
+        const pg = pages.find(p => p.id === id);
+        if (pg && !pg.selected) {
+          pg.selected = true;
+          selectedOrder.push(id);
+          pg.orderNum = selectedOrder.length;
+          card.classList.add('selected');
+          updateSelCount();
+        }
+      }
+    });
+  });
+
+  document.addEventListener('mouseup', e => {
+    if (!band) return;
+    band.remove();
+    band = null;
+    refreshCardStates();
+    updateSelCount();
+  });
+})();
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+});
+
 // ── Expose globals for inline onclick= attributes ─────────────────────────────
 Object.assign(window, {
-  setLang, selectAll, inverseSelect, mergeAll, mergeSelected,
+  setLang, selectAll, unselectAll, inverseSelect, mergeAll, mergeSelected,
   closeModal, exportMerged, splitPage, deletePage,
-  modalFilmDelete,
+  modalFilmDelete, undo, redo, modalZoom, modalZoomReset, toggleFilmstrip,
 });
 </script>
 </body>

@@ -240,7 +240,7 @@
   /* Page Grid */
   .page-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(max(160px, calc((100% - 100px) / 6)), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(max(200px, calc((100% - 100px) / 6)), 1fr));
     gap: 20px;
     padding-bottom: 20px;
     position: relative;
@@ -711,11 +711,7 @@
     flex: 1;
     overflow-y: auto;
     background: #111;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 24px 20px;
-    gap: 20px;
+    min-width: 0;
   }
 
   .modal-page-block {
@@ -758,33 +754,80 @@
     justify-content: center;
   }
 
-  /* ── FILMSTRIP ── */
-  .modal-filmstrip {
+  /* ── MODAL BODY (sidebar + viewer) ──────────── */
+  .modal-body {
+    flex: 1;
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
+    overflow: hidden;
+    min-height: 0;
   }
-  .modal-filmstrip::-webkit-scrollbar { height: 4px; }
-  .modal-filmstrip::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
 
-  .film-thumb {
-    flex-shrink: 0;
-    width: 70px;
-    position: relative;
+  /* ── MODAL SIDEBAR ───────────────────────────── */
+  .modal-sidebar {
+    width: 25%;
+    min-width: 120px;
+    max-width: 50%;
     background: var(--surface2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .modal-sidebar-grid {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    align-content: start;
+  }
+  .modal-sidebar-grid::-webkit-scrollbar { width: 5px; }
+  .modal-sidebar-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
+  .modal-sidebar-grid::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.45); }
+
+  /* ── MODAL SIDEBAR RESIZER ───────────────────── */
+  .modal-resizer {
+    width: 4px;
+    background: var(--border);
+    cursor: col-resize;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .modal-resizer:hover, .modal-resizer.dragging { background: var(--accent); }
+
+  /* ── FILM THUMB (sidebar version) ───────────── */
+  .film-thumb {
+    position: relative;
+    background: var(--surface3);
     border: 2px solid var(--border);
     border-radius: 6px;
     overflow: visible;
     cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s;
+    transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+    will-change: transform;
   }
-  .film-thumb:hover { border-color: #555; transform: translateY(-2px); }
+  .film-thumb:hover { border-color: #555; }
   .film-thumb.active {
     border-color: var(--accent2);
     box-shadow: 0 0 0 1px var(--accent2);
   }
-  .film-thumb.sortable-ghost { opacity: 0.3; }
+  .film-thumb.sortable-ghost {
+    opacity: 0;
+    border: 2px dashed var(--accent);
+    background: rgba(232,255,71,0.06);
+  }
+  .film-thumb.sortable-chosen {
+    opacity: 0.45;
+    transform: scale(0.94) rotate(1deg);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  }
+  .film-thumb.sortable-drag {
+    opacity: 0.45;
+    transform: scale(0.94) rotate(1deg);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.7);
+  }
   .film-thumb .ft-img {
     width: 100%;
     aspect-ratio: 0.707;
@@ -832,42 +875,6 @@
     gap: 10px;
   }
 
-  /* Filmstrip collapse toggle */
-  .modal-filmstrip-wrap {
-    flex-shrink: 0;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    transition: padding 0.2s, max-height 0.25s ease;
-    max-height: 200px;
-    overflow: hidden;
-  }
-  .modal-filmstrip-wrap.collapsed {
-    max-height: 28px;
-    padding-bottom: 0;
-  }
-  .filmstrip-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 14px;
-    cursor: pointer;
-    user-select: none;
-  }
-  .filmstrip-header span {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .filmstrip-toggle {
-    font-size: 0.65rem;
-    color: var(--text-dim);
-    transition: transform 0.2s;
-  }
-  .modal-filmstrip-wrap.collapsed .filmstrip-toggle {
-    transform: rotate(180deg);
-  }
   .modal-footer .page-count {
     font-family: 'DM Mono', monospace;
     font-size: 0.75rem;
@@ -906,9 +913,9 @@
 
   /* ── SCROLLBARS ─────────────────────────────── */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3d42; }
+  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.45); }
 
   /* ── HIDDEN FILE INPUT ───────────────────────── */
   #fileInput { display: none; }
@@ -1045,17 +1052,18 @@
         <span id="modalCurPage">1</span> / <span id="modalTotalPages">1</span>
       </div>
     </div>
-    <!-- Scrollable full-page viewer -->
-    <div class="modal-viewer" id="modalViewer">
-      <div class="modal-viewer-zoom" id="modalViewerZoom"></div>
-    </div>
-    <!-- Filmstrip -->
-    <div class="modal-filmstrip-wrap" id="modalFilmstripWrap">
-      <div class="filmstrip-header" onclick="toggleFilmstrip()">
-        <span>Pages</span>
-        <span class="filmstrip-toggle">▲</span>
+    <!-- Body: sidebar + viewer -->
+    <div class="modal-body">
+      <!-- Left sidebar thumbnails -->
+      <div class="modal-sidebar" id="modalSidebar">
+        <div class="modal-sidebar-grid" id="modalFilmstrip"></div>
       </div>
-      <div class="modal-filmstrip" id="modalFilmstrip"></div>
+      <!-- Resizer -->
+      <div class="modal-resizer" id="modalResizer"></div>
+      <!-- Scrollable full-page viewer -->
+      <div class="modal-viewer" id="modalViewer">
+        <div class="modal-viewer-zoom" id="modalViewerZoom"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <div class="page-count"><span id="modalPageCount">0</span> <span data-i18n="pages">pages</span></div>
@@ -1180,7 +1188,7 @@ const STRINGS = {
   }
 };
 
-let lang = localStorage.getItem('pdfcraft-lang') || 'en';
+let lang = localStorage.getItem('pdfcraft-lang') || 'vi';
 function t(key) { return STRINGS[lang][key] || key; }
 
 function setLang(l) {
@@ -1212,20 +1220,21 @@ const fullCache  = new Map();   // id → canvas (full-res, rendered by MuPDF)
 
 // ── History (undo/redo) ───────────────────────────────────────────────────────
 const MAX_HISTORY = 50;
-let undoStack = []; // each entry: { pages: snapshot, selectedOrder: snapshot }
+let undoStack = []; // each entry: { lean: [{id, selected, orderNum}], selectedOrder: [] }
 let redoStack = [];
 
+// Lean snapshot — only stores id, selected, orderNum (not heavy pdfBytes/mupdfDoc)
 function snapshotState() {
   return {
-    pages: pages.map(p => ({ ...p })),
+    lean: pages.map(p => ({ id: p.id, selected: p.selected, orderNum: p.orderNum })),
     selectedOrder: [...selectedOrder],
   };
 }
 
-function pushHistory() {
-  undoStack.push(snapshotState());
+function pushHistory(pre) {
+  undoStack.push(pre);
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
-  redoStack = []; // clear redo on new action
+  redoStack = [];
   updateUndoButtons();
 }
 
@@ -1236,47 +1245,58 @@ function updateUndoButtons() {
   if (r) r.disabled = redoStack.length === 0;
 }
 
-function flashChangedCards(prevIds, nextIds) {
-  // Find cards that changed (added, removed, reordered, selection changed)
-  const prevMap = new Map(prevIds.map((id, i) => [id, i]));
-  const nextMap = new Map(nextIds.map((id, i) => [id, i]));
+function flashChangedCards(prevLean, nextLean) {
+  const prevMap = new Map(prevLean.map((p, i) => [p.id, i]));
+  const nextMap = new Map(nextLean.map((p, i) => [p.id, i]));
   const changed = new Set();
-  nextIds.forEach((id, i) => {
-    if (!prevMap.has(id) || prevMap.get(id) !== i) changed.add(id);
+  nextLean.forEach((p, i) => {
+    const prev = prevMap.get(p.id);
+    if (prev === undefined || prev !== i || prevLean[prev]?.selected !== p.selected) changed.add(p.id);
   });
-  prevIds.forEach(id => { if (!nextMap.has(id)) changed.add(id); });
-  // Also flash cards whose selection changed
+  prevLean.forEach(p => { if (!nextMap.has(p.id)) changed.add(p.id); });
   changed.forEach(id => {
     const card = document.querySelector(`.page-card[data-id="${id}"]`);
     if (!card) return;
     card.classList.remove('flash-undo');
-    void card.offsetWidth; // reflow to restart animation
+    void card.offsetWidth;
     card.classList.add('flash-undo');
     setTimeout(() => card.classList.remove('flash-undo'), 360);
   });
 }
 
 function restoreState(snapshot) {
-  const prevIds = pages.map(p => p.id);
-  pages = snapshot.pages.map(p => ({ ...p }));
+  const prevLean = pages.map(p => ({ id: p.id, selected: p.selected, orderNum: p.orderNum }));
+  // Rebuild pages array in snapshot order, merging lean data onto full page objects
+  const pageMap = new Map(pages.map(p => [p.id, p]));
+  const restored = [];
+  for (const lean of snapshot.lean) {
+    const pg = pageMap.get(lean.id);
+    if (!pg) continue; // page was never loaded — skip
+    pg.selected = lean.selected;
+    pg.orderNum = lean.orderNum;
+    restored.push(pg);
+  }
+  pages = restored;
   selectedOrder = [...snapshot.selectedOrder];
   renderGrid();
-  flashChangedCards(prevIds, pages.map(p => p.id));
+  flashChangedCards(prevLean, pages.map(p => ({ id: p.id, selected: p.selected, orderNum: p.orderNum })));
 }
 
 function undo() {
   if (undoStack.length === 0) return;
-  redoStack.push(snapshotState());
+  const pre = snapshotState();
   const prev = undoStack.pop();
   restoreState(prev);
+  redoStack.push(pre);
   updateUndoButtons();
 }
 
 function redo() {
   if (redoStack.length === 0) return;
-  undoStack.push(snapshotState());
+  const pre = snapshotState();
   const next = redoStack.pop();
   restoreState(next);
+  undoStack.push(pre);
   updateUndoButtons();
 }
 
@@ -1438,8 +1458,12 @@ async function cacheFullPagesInBackground(pagesToCache) {
       const bounds = page.getBounds();
       page.destroy();
       const naturalW = bounds[2] - bounds[0];
-      const scale = 760 / naturalW;
+      const dpr = window.devicePixelRatio || 1;
+      const logicalW = 760;
+      const scale = (logicalW / naturalW) * dpr;
       const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+      canvas.style.width = logicalW + 'px';
+      canvas.style.height = 'auto';
       fullCache.set(pg.id, canvas);
     } catch(e) {}
   }
@@ -1448,12 +1472,13 @@ async function cacheFullPagesInBackground(pagesToCache) {
 async function renderThumbForPage(pg) {
   if (thumbCache.has(pg.id)) return;
   try {
-    // Scale to ~150px wide for thumbnails
     const page = pg.mupdfDoc.loadPage(pg.pageIndex);
     const bounds = page.getBounds();
     page.destroy();
-    const w = bounds[2] - bounds[0];
-    const scale = 150 / w;
+    const naturalW = bounds[2] - bounds[0];
+    const dpr = window.devicePixelRatio || 1;
+    // 250px logical width × DPR → sharp on retina screens
+    const scale = (250 / naturalW) * dpr;
     const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
     thumbCache.set(pg.id, canvas);
   } catch(e) { console.error('thumb render error', e); }
@@ -1525,9 +1550,10 @@ function renderGrid() {
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
     onEnd(evt) {
-      pushHistory();
+      const pre = snapshotState();
       const moved = pages.splice(evt.oldIndex, 1)[0];
       pages.splice(evt.newIndex, 0, moved);
+      pushHistory(pre);
       updateSelCount();
     }
   });
@@ -1543,7 +1569,7 @@ function shortName(name) {
 function toggleSelect(id) {
   const pg = pages.find(p => p.id === id);
   if (!pg) return;
-  pushHistory();
+  const pre = snapshotState();
   if (pg.selected) {
     pg.selected = false;
     pg.orderNum = 0;
@@ -1570,11 +1596,12 @@ function toggleSelect(id) {
     });
   }
   updateSelCount();
+  pushHistory(pre);
   setPreview(id);
 }
 
 function selectAll() {
-  pushHistory();
+  const pre = snapshotState();
   selectedOrder = [];
   pages.forEach(pg => {
     pg.selected = true;
@@ -1583,22 +1610,22 @@ function selectAll() {
   });
   refreshCardStates();
   updateSelCount();
+  pushHistory(pre);
 }
 
 function unselectAll() {
-  pushHistory();
+  const pre = snapshotState();
   pages.forEach(pg => { pg.selected = false; pg.orderNum = 0; });
   selectedOrder = [];
   refreshCardStates();
   updateSelCount();
+  pushHistory(pre);
 }
 
 function inverseSelect() {
-  pushHistory();
+  const pre = snapshotState();
   selectedOrder = [];
-  pages.forEach(pg => {
-    pg.selected = !pg.selected;
-  });
+  pages.forEach(pg => { pg.selected = !pg.selected; });
   pages.forEach(pg => {
     if (pg.selected) selectedOrder.push(pg.id);
     else pg.orderNum = 0;
@@ -1609,6 +1636,7 @@ function inverseSelect() {
   });
   refreshCardStates();
   updateSelCount();
+  pushHistory(pre);
 }
 
 function refreshCardStates() {
@@ -1656,7 +1684,11 @@ async function setPreview(id) {
     body.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'preview-canvas-wrap';
-    wrap.appendChild(copyCanvas(fullCache.get(id)));
+    const src = fullCache.get(id);
+    const c = copyCanvas(src);
+    c.style.width = src.style.width || '100%';
+    c.style.height = src.style.height || 'auto';
+    wrap.appendChild(c);
     body.appendChild(wrap);
     appendPreviewMeta(body, pg);
     return;
@@ -1670,15 +1702,19 @@ async function setPreview(id) {
     const panelEl = document.getElementById('previewPanel');
     const panelW = Math.min((panelEl ? panelEl.offsetWidth - 28 : 600), 800);
     const safeW = panelW > 50 ? panelW : 600;
+    const dpr = window.devicePixelRatio || 1;
 
     // Get page natural width to compute scale
     const page = pg.mupdfDoc.loadPage(pg.pageIndex);
     const bounds = page.getBounds();
     page.destroy();
     const naturalW = bounds[2] - bounds[0];
-    const scale = safeW / naturalW;
+    const scale = (safeW / naturalW) * dpr;
 
     const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+    // CSS size = logical width (canvas pixel size / dpr)
+    canvas.style.width = safeW + 'px';
+    canvas.style.height = 'auto';
     fullCache.set(id, canvas);
     renderingId = null;
 
@@ -1706,7 +1742,7 @@ function appendPreviewMeta(body, pg) {
 // ── Delete / Split ────────────────────────────────────────────────────────────
 function deletePage(e, id) {
   e.stopPropagation();
-  pushHistory();
+  const pre = snapshotState();
   pages = pages.filter(p => p.id !== id);
   selectedOrder = selectedOrder.filter(x => x !== id);
   if (previewingId === id) {
@@ -1714,11 +1750,11 @@ function deletePage(e, id) {
     document.getElementById('previewBody').innerHTML = `<div class="preview-empty"><div class="pe-icon">👁</div><p>${t('previewEmpty')}</p></div>`;
     document.getElementById('previewInfo').textContent = '';
   }
+  pushHistory(pre);
   renderGrid();
 }
 
-async function splitPage(e, id) {
-  e.stopPropagation();
+async function splitPage(e, id) {  e.stopPropagation();
   const pg = pages.find(p => p.id === id);
   if (!pg) return;
   const defaultName = `page-${pg.pageIndex + 1}-${pg.fileName}`.replace(/\.pdf$/i, '') + '.pdf';
@@ -1784,8 +1820,12 @@ async function openModal(pagesArr, title) {
         const bounds = page.getBounds();
         page.destroy();
         const naturalW = bounds[2] - bounds[0];
-        const scale = 760 / naturalW;
+        const dpr = window.devicePixelRatio || 1;
+        const logicalW = 760;
+        const scale = (logicalW / naturalW) * dpr;
         const canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+        canvas.style.width = logicalW + 'px';
+        canvas.style.height = 'auto';
         fullCache.set(pg.id, canvas);
       } catch(e) {}
     }
@@ -1885,17 +1925,23 @@ async function renderModalPageFull(pg, idx) {
     let canvas;
     // Reuse fullCache if available — no re-render needed
     if (fullCache.has(pg.id)) {
-      canvas = copyCanvas(fullCache.get(pg.id));
+      const src = fullCache.get(pg.id);
+      canvas = copyCanvas(src);
+      canvas.style.width = src.style.width || '100%';
+      canvas.style.height = src.style.height || 'auto';
     } else {
       const viewer = document.getElementById('modalViewer');
       const maxW = Math.min((viewer ? viewer.offsetWidth - 48 : 720), 760);
       const safeW = maxW > 0 ? maxW : 720;
+      const dpr = window.devicePixelRatio || 1;
       const page = pg.mupdfDoc.loadPage(pg.pageIndex);
       const bounds = page.getBounds();
       page.destroy();
       const naturalW = bounds[2] - bounds[0];
-      const scale = safeW / naturalW;
+      const scale = (safeW / naturalW) * dpr;
       canvas = mupdfRenderPage(pg.mupdfDoc, pg.pageIndex, scale);
+      canvas.style.width = safeW + 'px';
+      canvas.style.height = 'auto';
       fullCache.set(pg.id, canvas);
       canvas = copyCanvas(canvas);
     }
@@ -1949,8 +1995,11 @@ function renderModalFilmstrip() {
 
   if (filmSortable) filmSortable.destroy();
   filmSortable = Sortable.create(strip, {
-    animation: 150,
+    animation: 350,
+    easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
     ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
     onEnd(evt) {
       const moved = modalPages.splice(evt.oldIndex, 1)[0];
       modalPages.splice(evt.newIndex, 0, moved);
@@ -2021,10 +2070,37 @@ document.getElementById('modalViewer').addEventListener('wheel', e => {
   modalZoom(e.deltaY < 0 ? +1 : -1);
 }, { passive: false });
 
-function toggleFilmstrip() {
-  const wrap = document.getElementById('modalFilmstripWrap');
-  wrap.classList.toggle('collapsed');
-}
+function toggleFilmstrip() {} // no-op, filmstrip is now sidebar
+
+// ── Modal sidebar resizer ─────────────────────────────────────────────────────
+(function() {
+  const resizer = document.getElementById('modalResizer');
+  if (!resizer) return;
+  let dragging = false, startX = 0, startW = 0;
+
+  resizer.addEventListener('mousedown', e => {
+    dragging = true;
+    startX = e.clientX;
+    startW = document.getElementById('modalSidebar').offsetWidth;
+    resizer.classList.add('dragging');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta = e.clientX - startX;
+    const modal = document.querySelector('.modal');
+    const modalW = modal ? modal.offsetWidth : window.innerWidth;
+    const newW = Math.max(120, Math.min(startW + delta, modalW * 0.6));
+    document.getElementById('modalSidebar').style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+  });
+})();
 
 function modalFilmDelete(e, idx) {
   e.stopPropagation();
@@ -2183,13 +2259,14 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
   let band = null, startX = 0, startY = 0, scrollTopStart = 0;
   const organizer = document.getElementById('organizer');
 
+  let rubberBandPre = null;
+
   organizer.addEventListener('mousedown', e => {
-    // Only start on empty grid background, left button only
     if (e.button !== 0) return;
     if (e.target.closest('.page-card')) return;
     if (!document.getElementById('pageGrid') || pages.length === 0) return;
 
-    pushHistory(); // snapshot before rubber-band selection starts
+    rubberBandPre = snapshotState(); // capture pre-state before drag
 
     const gridRect = grid.getBoundingClientRect();
     startX = e.clientX - gridRect.left + grid.parentElement.scrollLeft;
@@ -2261,6 +2338,7 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
     band = null;
     refreshCardStates();
     updateSelCount();
+    if (rubberBandPre) { pushHistory(rubberBandPre); rubberBandPre = null; }
   });
 })();
 
@@ -2268,6 +2346,7 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') { e.preventDefault(); selectAll(); }
 });
 
 // ── Expose globals for inline onclick= attributes ─────────────────────────────
